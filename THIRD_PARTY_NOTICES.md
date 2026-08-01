@@ -20,11 +20,18 @@ texts are retained below so every application bundle remains self-contained.
 | JBIG2, OpenJPEG, qcms, and QuickJS | PDF decoding, color, and sandbox WASM resources and wrappers | Apache-2.0, BSD-style, MIT, and component-specific terms below |
 | `dictionary-en` / SCOWL            | English Hunspell affix and dictionary data                   | Composite notices below                                        |
 | Feather Icons                      | Adapted inline interface glyph geometry                      | MIT                                                            |
+| Rust CSS parser dependencies       | Compiled CSS parsing and selector components                 | MPL-2.0                                                        |
 
 The PDF.js viewer-image assets are distributed as part of PDF.js under its
 Apache-2.0 license. The NoteM logo and its generated platform icons are
 project artwork covered by NoteM's MIT license; see
 `docs/ASSET_PROVENANCE.md`.
+
+The compiled Rust dependency graph also contains `cssparser 0.36.0`,
+`cssparser-macros 0.6.1`, `dtoa-short 0.3.5`, `option-ext 0.2.0`, and
+`selectors 0.36.1` under MPL-2.0. Their corresponding source is available
+from crates.io at the exact versions recorded in `src-tauri/Cargo.lock`. The
+complete MPL-2.0 text is retained in the PDF.js component notices below.
 
 ## pdfjs-dist — Apache License 2.0
 

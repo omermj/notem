@@ -69,6 +69,17 @@ jobs:
         working-directory: src-tauri
         run: cargo clippy --all-targets -- -D warnings
 
+      - name: Install pinned Rust security tools
+        run: |
+          cargo install cargo-audit --version 0.22.2 --locked
+          cargo install cargo-deny --version 0.20.2 --locked
+
+      - name: Rust advisory and policy checks
+        working-directory: src-tauri
+        run: |
+          cargo audit
+          cargo deny check
+
       - name: Performance targets
         if: github.event_name == 'workflow_dispatch'
         working-directory: src-tauri
