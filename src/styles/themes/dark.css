@@ -1,0 +1,67 @@
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --color-bg: #17191d;
+  --color-surface: #1e2025;
+  --color-sidebar: #191b20;
+  --color-tabbar: #1b1d22;
+  --color-border: #2d3037;
+  --color-border-strong: #474b55;
+  --color-text: #d6d8de;
+  --color-text-strong: #f2f3f5;
+  --color-text-muted: #9296a1;
+  --color-text-subtle: #737782;
+  --color-accent: #8a7cf2;
+  --color-accent-hover: #9a8ef6;
+  --color-accent-contrast: #15141d;
+  --color-danger: #e06068;
+  --color-danger-hover: #ef747c;
+  --color-danger-contrast: #17191d;
+  --color-overlay: rgb(0 0 0 / 52%);
+  --color-graph-1: #9589f5;
+  --color-graph-2: #55c3bb;
+  --color-graph-3: #ed9b6d;
+  --color-graph-4: #73b1eb;
+  --color-graph-5: #e186ad;
+  --color-graph-6: #9bc66d;
+  --color-graph-7: #d5ad68;
+  --color-graph-8: #91a4ed;
+  --shadow-small: 0 1px 5px rgb(0 0 0 / 25%);
+  --shadow-medium: 0 12px 36px rgb(0 0 0 / 38%);
+  --shadow-modal: 0 18px 60px rgb(0 0 0 / 48%);
+  --shadow-soft: 0 10px 30px rgb(0 0 0 / 28%);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    color-scheme: dark;
+    --color-bg: #17191d;
+    --color-surface: #1e2025;
+    --color-sidebar: #191b20;
+    --color-tabbar: #1b1d22;
+    --color-border: #2d3037;
+    --color-border-strong: #474b55;
+    --color-text: #d6d8de;
+    --color-text-strong: #f2f3f5;
+    --color-text-muted: #9296a1;
+    --color-text-subtle: #737782;
+    --color-accent: #8a7cf2;
+    --color-accent-hover: #9a8ef6;
+    --color-accent-contrast: #15141d;
+    --color-danger: #e06068;
+    --color-danger-hover: #ef747c;
+    --color-danger-contrast: #17191d;
+    --color-overlay: rgb(0 0 0 / 52%);
+    --color-graph-1: #9589f5;
+    --color-graph-2: #55c3bb;
+    --color-graph-3: #ed9b6d;
+    --color-graph-4: #73b1eb;
+    --color-graph-5: #e186ad;
+    --color-graph-6: #9bc66d;
+    --color-graph-7: #d5ad68;
+    --color-graph-8: #91a4ed;
+    --shadow-small: 0 1px 5px rgb(0 0 0 / 25%);
+    --shadow-medium: 0 12px 36px rgb(0 0 0 / 38%);
+    --shadow-modal: 0 18px 60px rgb(0 0 0 / 48%);
+    --shadow-soft: 0 10px 30px rgb(0 0 0 / 28%);
+  }
+}

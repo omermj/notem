@@ -1,0 +1,97 @@
+name: Bug report
+description: Report reproducible incorrect behavior in NoteM.
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for helping improve NoteM. Use a synthetic vault when possible. Remove note contents, personal paths, usernames, email addresses, tokens, and other private data from screenshots and logs.
+
+        Security vulnerabilities must be reported through the private link in `SECURITY.md`, not this form.
+
+  - type: input
+    id: version
+    attributes:
+      label: NoteM version
+      description: Use the version shown in Settings → About or the exact commit SHA for a source build.
+      placeholder: v0.2.1
+    validations:
+      required: true
+
+  - type: dropdown
+    id: operating-system
+    attributes:
+      label: Operating system
+      options:
+        - Linux
+        - macOS
+        - Windows
+        - Unsupported platform
+    validations:
+      required: true
+
+  - type: input
+    id: os-version
+    attributes:
+      label: Operating-system version and architecture
+      placeholder: macOS 15.6 arm64, Windows 11 x86-64, or Ubuntu 24.04 x86-64
+    validations:
+      required: true
+
+  - type: dropdown
+    id: installation
+    attributes:
+      label: Installation method
+      options:
+        - AppImage
+        - Debian package
+        - macOS DMG
+        - Windows NSIS installer
+        - Built from source
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: current-behavior
+    attributes:
+      label: What happened?
+      description: Describe the incorrect behavior and any visible error message.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Reproduction steps
+      description: Provide the smallest repeatable sequence using synthetic files and names.
+      placeholder: |
+        1. Create a vault containing ...
+        2. Open ...
+        3. Choose ...
+        4. Observe ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Additional diagnostics
+      description: Add redacted logs, screenshots, crash details, or a minimal synthetic fixture. Dragging files here uploads them publicly.
+
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: Privacy check
+      options:
+        - label: I removed credentials, personal paths, private note content, and other identifying information from this report and its attachments.
+          required: true

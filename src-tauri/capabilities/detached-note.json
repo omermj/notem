@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "detached-note",
+  "description": "Minimal core permissions for detached note and PDF windows",
+  "windows": ["note-*"],
+  "permissions": ["core:default"]
+}

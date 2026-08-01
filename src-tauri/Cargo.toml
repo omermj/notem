@@ -1,0 +1,35 @@
+[package]
+name = "notem"
+version = "0.2.0"
+description = "A lightweight, local-first Markdown knowledge base"
+authors = ["NoteM contributors"]
+edition = "2021"
+license = "MIT"
+homepage = "https://github.com/omermj/notem"
+repository = "https://github.com/omermj/notem"
+readme = "../README.md"
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+gray_matter = "0.2"
+notify = "8"
+open = "5"
+regex = "1"
+rusqlite = { version = "0.37", features = ["bundled"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+serde_yaml = "0.9"
+tauri = { version = "2", features = ["protocol-asset"] }
+tauri-plugin-clipboard-manager = "2"
+tauri-plugin-dialog = "2"
+tauri-plugin-single-instance = "2"
+tauri-plugin-window-state = "2"
+thiserror = "2"
+trash = "5"
+walkdir = "2"
+urlencoding = "2"
+
+[dev-dependencies]
+tempfile = "3"

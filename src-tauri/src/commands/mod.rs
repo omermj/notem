@@ -1,0 +1,11 @@
+pub mod files;
+pub mod frontmatter;
+pub mod index;
+pub mod links;
+pub mod performance;
+pub mod search;
+pub mod settings;
+pub mod startup;
+pub mod tags;
+pub mod vault;
+pub mod window;
