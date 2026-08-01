@@ -108,13 +108,28 @@ Codex may maintain private `refs/codex/turn-diffs/*` checkpoints for local chang
 
 The candidate tree was checked for common credentials, private keys, local developer paths, the personal email identified by the audit, and Arial font markers. The regenerated Unicode fixture contains Liberation Sans and no Arial marker. A checksum-verified, ephemeral Gitleaks 8.30.1 scan examined the parentless candidate history and reported no leaks. Native-platform validation remains a publication gate.
 
+## Phase 7 remediation record
+
+Phase 7 completed the controlled release cutover and validation on 2026-08-01:
+
+- The verified Phase 0 bundle was rechecked before the private remote was changed. Remote `main` was replaced with only the clean public history using an exact force-with-lease; the withdrawn `v0.2.0` draft and tag were deleted. No private `refs/codex/*` ref was pushed.
+- Package, Cargo, and Tauri metadata were advanced consistently to `0.2.1`. The annotated `v0.2.1` tag points to `3a332ddede4eaf14e840634e28f09a971f7b5de3`, whose commit/tag metadata use the GitHub noreply address. A final Gitleaks 8.30.1 scan found no leak in the three-commit tagged history.
+- `event-listener` was updated from 5.4.1 to patched 5.4.2. `cargo audit` reports no vulnerability-class advisory; the remaining maintenance warnings and Tauri's Linux GTK/GLib advisory are documented. `cargo deny` passes the supported-target advisory, license, ban, and source policy, with one reasoned exception for the transitive GLib 0.18 advisory that has no compatible patched release.
+- The full local frontend/Rust gate passes, as do both pnpm audits, the theme audit, release performance test, and checksum-verified Actionlint 1.7.12. The performance fixture indexed 5,000 notes in 1.44 seconds and searched in 4.4 milliseconds.
+- Hardened GitHub CI passed on Linux. A separate read-only native matrix passed Rust tests, all-target/all-feature Clippy with `-D warnings`, installer builds, and bundled-legal checks on Linux x86-64, macOS ARM, and Windows x86-64.
+- The release workflow accepted only the existing annotated tag, built all three platforms with read-only jobs, revalidated the tag, and created an unsigned `v0.2.1` draft with AppImage, DEB, DMG, NSIS, and `SHA256SUMS` assets. It did not publish the release.
+- The hosted artifacts and Actions ZIP digests were backed up outside the repository. The DMG and DEB contain exact legal files; AppImage SquashFS contains exact copies; NSIS contains content-identical CRLF copies. The hosted macOS app has a valid ad-hoc signature, and the extracted Windows application is PE32+ x86-64 with subsystem 2 (Windows GUI).
+- Release and native-validation workflows now test every target, deny Clippy warnings, check bundled legal documents, and reject a Windows console-subsystem executable. Artifact Actions were refreshed to immutable Node 24-compatible `upload-artifact@v6` and `download-artifact@v7` SHAs.
+
+The `v0.2.1` binary release intentionally remains a draft until the maintainer launches and smoke-tests each installer on its native operating system. Screenshot placeholders remain the explicit maintainer-accepted presentation exception.
+
 ## 1. Executive verdict
 
-## NOT READY
+## CONDITIONALLY READY
 
-Do not change the repository to public yet.
+The source repository is ready for public visibility after the Phase 7 GitHub controls below are enabled. Keep the unsigned `v0.2.1` binary release as a draft until maintainer runtime smoke tests are complete.
 
-No live API key, token, private key, cloud credential, signing credential, webhook, connection string, `.env` file, or personal vault was found by the manual current-tree and reachable-history scans. However, the repository is not legally or operationally ready for public visibility:
+**Original audit-time verdict, retained for traceability:** no live API key, token, private key, cloud credential, signing credential, webhook, connection string, `.env` file, or personal vault was found by the manual current-tree and reachable-history scans. At the original `v0.2.0` revision, the repository was not legally or operationally ready for public visibility because:
 
 1. There is no root `LICENSE`; the README expressly says no license has been selected and all rights are reserved.
 2. `src-tauri/tests/fixtures/vault/attachments/pdf-fixtures/unicode.pdf` embeds a subset of proprietary Arial Unicode MS. It is present in the current tree and reachable history beginning at commit `23f3fc5`. The generator prefers this font on macOS.
@@ -125,7 +140,7 @@ No live API key, token, private key, cloud credential, signing credential, webho
 7. `pnpm audit` reports one high-severity advisory in development tooling.
 8. Every GitHub Action uses a mutable tag/branch. The release job checks out a caller-selected ref while holding `contents: write` and runs code from that ref.
 
-Recommendation: complete the P0/P1 work below, clean or replace public history, rebuild/withdraw the release, run the unavailable scanners and native-platform checks, and complete the checklist before publication.
+The original recommendation was to complete the P0/P1 work below, clean or replace public history, rebuild/withdraw the release, run the unavailable scanners and native-platform checks, and complete the checklist before publication. Phases 0–7 subsequently completed those items except the explicitly deferred screenshots and runtime smoke tests.
 
 ## 2. Audit method and limits
 
@@ -143,8 +158,8 @@ Recommendation: complete the P0/P1 work below, clean or replace public history, 
 ### Not fully verified
 
 - At audit time, `gitleaks` was not installed. Phase 6 subsequently ran a checksum-verified ephemeral Gitleaks 8.30.1 binary against the parentless candidate history with no leaks found.
-- `cargo-audit` and `cargo-deny` were not installed. Rust advisories and policy evaluation remain unverified.
-- Windows/Linux builds and Clippy were not runnable on this Apple Silicon host. Static confirmation and existing Actions state were used.
+- At audit time, `cargo-audit` and `cargo-deny` were not installed. Phase 7 subsequently ran checksum-verified/ephemeral tools and added the passing policy to CI.
+- Windows/Linux builds and Clippy were not runnable on this Apple Silicon host during the audit. Phase 7 subsequently completed the native hosted matrix.
 - Signing/notarization, SmartScreen reputation, Linux package signing, and reproducibility cannot be verified because signing is not configured.
 - Git cannot prove asset authorship. The logo appears project-specific and raster icons appear derived from it, but a contributor must attest to provenance. At least one inline glyph is recognizably Feather-derived and needs attribution or replacement.
 - This audit did not reverse-engineer every transitive dependency or execute untrusted PDFs.
@@ -754,7 +769,7 @@ Expected on the final release commit: no output.
 - [x] Reading-view anchors cannot navigate via unsupported destinations.
 - [x] Production CSP has no unnecessary dev loopback.
 - [x] Custom IPC/secondary-window capabilities are reviewed under a documented threat model.
-- [ ] cargo-audit, cargo-deny, pnpm audit, and production audit have acceptable results.
+- [x] cargo-audit, cargo-deny, pnpm audit, and production audit have acceptable results.
 
 ### CI and releases
 
@@ -762,12 +777,12 @@ Expected on the final release commit: no output.
 - [ ] Builds are read-only; publication is narrow and protected (workflow complete; `release` environment protection pending).
 - [ ] Release input is an immutable `v*` tag before code executes (workflow validation complete; tag ruleset pending).
 - [x] Checkout does not persist credentials into selected/untrusted builds.
-- [ ] Native Linux, macOS ARM, and Windows tests/Clippy/builds pass.
+- [x] Native Linux, macOS ARM, and Windows tests/Clippy/builds pass.
 - [x] Theme audit passes.
-- [ ] Windows release has no console (source fix complete; native Windows launch pending).
+- [x] Windows executable selects PE subsystem 2 (Windows GUI/no console allocation).
 - [x] Current `v0.2.0` is withdrawn or rebuilt from cleaned tag.
-- [ ] Release notes disclose signing status and publish checksums.
-- [ ] License/notices are verified inside each artifact.
+- [x] Draft release notes disclose signing status and include checksums.
+- [x] License/notices are verified inside each artifact.
 
 ### Public presentation
 
@@ -795,18 +810,18 @@ The audit-time failures below are retained for traceability; the remediation col
 | `pnpm audit`                                       | **Advisory** — 1 high development-only vulnerability | Pass — no known vulnerabilities                                  |
 | `pnpm audit --prod`                                | Pass                                                 | Pass — no known vulnerabilities                                  |
 | `gitleaks git -v --redact=100 .`                   | Not run — missing                                    | Pass — checksum-verified ephemeral 8.30.1 scan, no leaks         |
-| `cargo audit`                                      | Not run — missing                                    | Not run — missing                                                |
-| `cargo deny check`                                 | Not run — missing                                    | Not run — missing                                                |
-| Latest GitHub CI                                   | **Fail**; Rust stages skipped                        | Hardened workflow is unrun                                       |
-| Native Windows/Linux Clippy and packages           | Not run; source defects confirmed                    | Source defects fixed; native validation pending                  |
+| `cargo audit`                                      | Not run — missing                                    | Pass — no vulnerability-class advisory; documented warnings      |
+| `cargo deny check`                                 | Not run — missing                                    | Pass — reviewed advisory/license/ban/source policy               |
+| Latest GitHub CI                                   | **Fail**; Rust stages skipped                        | Pass — hardened Linux workflow                                   |
+| Native Windows/Linux Clippy and packages           | Not run; source defects confirmed                    | Pass — native tests, strict Clippy, builds, and legal gates      |
 | macOS ARM release-mode Tauri application bundle    | Not part of original audit                           | Pass                                                             |
-| Workflow YAML/pinning/tag/draft behavior checks    | Not part of original audit                           | Local checks pass; first hosted run and `actionlint` pending     |
+| Workflow YAML/pinning/tag/draft behavior checks    | Not part of original audit                           | Pass — hosted draft run plus checksum-verified Actionlint 1.7.12 |
 | Public documentation formatting and relative links | Not part of original audit                           | Pass; screenshots and security-feature enablement remain pending |
 
 ## Final recommendation
 
-**NO-GO for public visibility today.**
+**GO for public source visibility after the Phase 7 GitHub controls are verified.**
 
-The current working tree has remediated the licensing, bundled notices, proprietary-font fixture, Tauri path/link/CSP/capability issues, known build defects, JavaScript advisory, workflow supply chain, and public documentation findings through Phase 5. No live secret was found by the original manual scans.
+The clean public history has remediated the licensing, bundled notices, proprietary-font fixture, Tauri path/link/CSP/capability issues, known build defects, dependency advisories, workflow supply chain, and public documentation findings. No live secret was found by the manual or Gitleaks scans, and native validation passes on all supported platforms.
 
-The remaining blockers are cargo-audit/cargo-deny, native Linux and Windows validation, controlled replacement of the private remote refs, the first hosted CI/release-workflow run, GitHub environment/tag/security/branch settings, installer notice inspection, and maintainer-supplied screenshots. Make the repository public only after those checks pass or each residual risk is explicitly accepted in writing.
+The unsigned `v0.2.1` release must remain a draft until maintainer runtime smoke tests are complete. Real screenshots remain the maintainer's explicit deferred item. Neither item blocks publishing the source repository when the release environment, tag/branch rules, private vulnerability reporting, and repository security settings are active.

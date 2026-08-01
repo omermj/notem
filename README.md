@@ -12,7 +12,7 @@ NoteM is a lightweight, local-first Markdown knowledge-base app for Linux, macOS
 
 ## Project status
 
-NoteM is pre-1.0 software under active development. The private `v0.2.0` build was withdrawn from publication during the open-source readiness review; `v0.2.1` is planned as the first public release. Until the cross-platform release checklist is complete, build from source and keep backups of important vaults.
+NoteM is pre-1.0 software under active development. The private `v0.2.0` build was withdrawn during the open-source readiness review. A cross-platform `v0.2.1` draft was built from the cleaned public tag and is planned as the first public release after maintainer runtime smoke tests. Until then, build from source and keep backups of important vaults.
 
 ## Install
 
@@ -52,7 +52,7 @@ Run the NSIS setup executable. Windows code signing is not configured, so SmartS
 | macOS 11+                                                     | Apple Silicon (`arm64`) | DMG              | Supported release target                     |
 | Windows 10/11                                                 | x86-64                  | NSIS `.exe`      | Supported release target                     |
 
-Intel macOS, Linux ARM, Windows ARM, mobile platforms, and 32-bit operating systems are not currently supported. Native Linux and Windows release validation is still required before `v0.2.1` can be published.
+Intel macOS, Linux ARM, Windows ARM, mobile platforms, and 32-bit operating systems are not currently supported. Native Linux x86-64, macOS ARM, and Windows x86-64 tests, strict Clippy, and installer builds pass in the release-validation workflow; the unsigned installers still require maintainer runtime smoke tests before `v0.2.1` is published.
 
 ## Verify downloads and signing
 
