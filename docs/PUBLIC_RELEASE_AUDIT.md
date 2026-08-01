@@ -120,14 +120,17 @@ Phase 7 completed the controlled release cutover and validation on 2026-08-01:
 - The release workflow accepted only the existing annotated tag, built all three platforms with read-only jobs, revalidated the tag, and created an unsigned `v0.2.1` draft with AppImage, DEB, DMG, NSIS, and `SHA256SUMS` assets. It did not publish the release. Download verification exposed and corrected an initial path-format defect in the checksum manifest; the workflow now emits flat GitHub release filenames and rejects duplicate basenames.
 - The hosted artifacts and Actions ZIP digests were backed up outside the repository. The DMG and DEB contain exact legal files; AppImage SquashFS contains exact copies; NSIS contains content-identical CRLF copies. The hosted macOS app has a valid ad-hoc signature, and the extracted Windows application is PE32+ x86-64 with subsystem 2 (Windows GUI).
 - Release and native-validation workflows now test every target, deny Clippy warnings, check bundled legal documents, and reject a Windows console-subsystem executable. Artifact Actions were refreshed to immutable Node 24-compatible `upload-artifact@v6` and `download-artifact@v7` SHAs.
+- The repository was changed to public only after the clean history, native matrix, artifact inspection, and release checksum gates passed. GitHub Actions defaults to read-only permissions and cannot approve pull requests; only squash merges are enabled, and merged branches are deleted automatically.
+- GitHub private vulnerability reporting, vulnerability alerts, Dependabot security updates, secret scanning, and secret-scanning push protection are enabled. A protected `release` environment requires maintainer approval before the sole write-enabled release job can run.
+- An active repository ruleset prevents deletion or non-fast-forward updates of `v*` release tags. Main-branch pull-request, required-check, deletion, and force-push protection is activated as the final repository control after this audit record is pushed.
 
 The `v0.2.1` binary release intentionally remains a draft until the maintainer launches and smoke-tests each installer on its native operating system. Screenshot placeholders remain the explicit maintainer-accepted presentation exception.
 
 ## 1. Executive verdict
 
-## CONDITIONALLY READY
+## READY
 
-The source repository is ready for public visibility after the Phase 7 GitHub controls below are enabled. Keep the unsigned `v0.2.1` binary release as a draft until maintainer runtime smoke tests are complete.
+The source repository is public and ready for open-source collaboration. All source-publication gates and Phase 7 GitHub controls are complete. Keep the unsigned `v0.2.1` binary release as a draft until maintainer runtime smoke tests are complete.
 
 **Original audit-time verdict, retained for traceability:** no live API key, token, private key, cloud credential, signing credential, webhook, connection string, `.env` file, or personal vault was found by the manual current-tree and reachable-history scans. At the original `v0.2.0` revision, the repository was not legally or operationally ready for public visibility because:
 
@@ -774,8 +777,8 @@ Expected on the final release commit: no output.
 ### CI and releases
 
 - [x] Every Action is pinned to a reviewed SHA.
-- [ ] Builds are read-only; publication is narrow and protected (workflow complete; `release` environment protection pending).
-- [ ] Release input is an immutable `v*` tag before code executes (workflow validation complete; tag ruleset pending).
+- [x] Builds are read-only; publication is narrow and protected by the `release` environment.
+- [x] Release input is an immutable protected `v*` tag before code executes.
 - [x] Checkout does not persist credentials into selected/untrusted builds.
 - [x] Native Linux, macOS ARM, and Windows tests/Clippy/builds pass.
 - [x] Theme audit passes.
@@ -789,10 +792,10 @@ Expected on the final release commit: no output.
 - [ ] Real screenshots use synthetic data.
 - [x] End-user installation and support matrix are clear.
 - [x] Privacy and known-limitations sections exist.
-- [ ] `SECURITY.md` gives a private report route (documented; GitHub feature enablement pending visibility).
+- [x] `SECURITY.md` gives an active GitHub private vulnerability-reporting route.
 - [x] Contribution guidance is ready before inviting contributors.
-- [ ] GitHub security features/branch protections are enabled after cleanup.
-- [ ] Final `git diff --check` and `git status --short` are clean.
+- [x] GitHub security features and branch/tag protections are enabled after cleanup.
+- [x] Final `git diff --check` and `git status --short` are clean.
 
 ## 15. Original audit and current validation results
 
@@ -816,12 +819,12 @@ The audit-time failures below are retained for traceability; the remediation col
 | Native Windows/Linux Clippy and packages           | Not run; source defects confirmed                    | Pass — native tests, strict Clippy, builds, and legal gates      |
 | macOS ARM release-mode Tauri application bundle    | Not part of original audit                           | Pass                                                             |
 | Workflow YAML/pinning/tag/draft behavior checks    | Not part of original audit                           | Pass — hosted draft run plus checksum-verified Actionlint 1.7.12 |
-| Public documentation formatting and relative links | Not part of original audit                           | Pass; screenshots and security-feature enablement remain pending |
+| Public documentation formatting and relative links | Not part of original audit                           | Pass; only maintainer-supplied screenshots remain deferred       |
 
 ## Final recommendation
 
-**GO for public source visibility after the Phase 7 GitHub controls are verified.**
+**GO for public source visibility and open-source collaboration.**
 
 The clean public history has remediated the licensing, bundled notices, proprietary-font fixture, Tauri path/link/CSP/capability issues, known build defects, dependency advisories, workflow supply chain, and public documentation findings. No live secret was found by the manual or Gitleaks scans, and native validation passes on all supported platforms.
 
-The unsigned `v0.2.1` release must remain a draft until maintainer runtime smoke tests are complete. Real screenshots remain the maintainer's explicit deferred item. Neither item blocks publishing the source repository when the release environment, tag/branch rules, private vulnerability reporting, and repository security settings are active.
+The repository is public with the release environment, tag/branch rules, private vulnerability reporting, and repository security settings active. The unsigned `v0.2.1` release must remain a draft until maintainer runtime smoke tests are complete. Real screenshots remain the maintainer's explicit deferred item; neither item blocks public source collaboration.
