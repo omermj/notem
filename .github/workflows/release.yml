@@ -122,6 +122,7 @@ jobs:
         uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # stable
         with:
           toolchain: 1.97.1
+          components: clippy
           targets: ${{ matrix.rust_target }}
 
       - name: Cache Rust build outputs
@@ -137,8 +138,36 @@ jobs:
           RELEASE_TAG: ${{ inputs.tag }}
         run: node scripts/verify-release-version.mjs
 
+      - name: Run native Rust tests
+        working-directory: src-tauri
+        run: cargo test
+
+      - name: Run native Rust clippy
+        working-directory: src-tauri
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
       - name: Build platform bundle
         run: pnpm tauri build ${{ matrix.tauri_args }}
+
+      - name: Verify Windows GUI subsystem
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $executable = 'src-tauri/target/release/notem.exe'
+          $bytes = [System.IO.File]::ReadAllBytes($executable)
+          if ($bytes.Length -lt 256) {
+            throw "Windows executable is unexpectedly short."
+          }
+          $peOffset = [System.BitConverter]::ToInt32($bytes, 0x3c)
+          $signature = [System.Text.Encoding]::ASCII.GetString($bytes, $peOffset, 4)
+          if ($signature -ne "PE`0`0") {
+            throw "Windows executable has an invalid PE signature."
+          }
+          $subsystem = [System.BitConverter]::ToUInt16($bytes, $peOffset + 24 + 68)
+          if ($subsystem -ne 2) {
+            throw "Expected Windows GUI subsystem 2, found $subsystem."
+          }
+          Write-Host "Verified Windows GUI subsystem 2 (no console window)."
 
       - name: Verify bundled legal documents
         run: node scripts/verify-bundle-legal.mjs ${{ matrix.target_root }}
