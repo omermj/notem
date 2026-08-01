@@ -1,0 +1,117 @@
+name: Native validation
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/native-validation.yml
+      - package.json
+      - pnpm-lock.yaml
+      - scripts/verify-bundle-legal.mjs
+      - src-tauri/**
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/native-validation.yml
+  workflow_dispatch:
+
+concurrency:
+  group: native-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.platform }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Linux x64
+            platform: ubuntu-22.04
+            rust_target: ""
+            tauri_args: --bundles appimage,deb
+            target_root: src-tauri/target/release
+          - name: macOS ARM
+            platform: macos-14
+            rust_target: aarch64-apple-darwin
+            tauri_args: --target aarch64-apple-darwin --bundles dmg
+            target_root: src-tauri/target/aarch64-apple-darwin/release
+          - name: Windows x64
+            platform: windows-2025
+            rust_target: ""
+            tauri_args: --bundles nsis
+            target_root: src-tauri/target/release
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Install Linux build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf libfuse2
+
+      - name: Set up Node.js
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
+        with:
+          node-version: 22.18.0
+
+      - name: Enable pinned pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@11.17.0 --activate
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@4cda84d5c5c54efe2404f9d843567869ab1699d4 # stable
+        with:
+          toolchain: 1.97.1
+          components: clippy
+          targets: ${{ matrix.rust_target }}
+
+      - name: Cache Rust build outputs
+        uses: swatinem/rust-cache@e18b497796c12c097a38f9edb9d0641fb99eee32 # v2
+        with:
+          workspaces: src-tauri -> target
+
+      - name: Install frontend dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run native Rust tests
+        working-directory: src-tauri
+        run: cargo test
+
+      - name: Run native Rust clippy
+        working-directory: src-tauri
+        run: cargo clippy --all-targets --all-features -- -D warnings
+
+      - name: Build platform bundle
+        run: pnpm tauri build ${{ matrix.tauri_args }}
+
+      - name: Verify Windows GUI subsystem
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $executable = 'src-tauri/target/release/notem.exe'
+          $bytes = [System.IO.File]::ReadAllBytes($executable)
+          if ($bytes.Length -lt 256) {
+            throw "Windows executable is unexpectedly short."
+          }
+          $peOffset = [System.BitConverter]::ToInt32($bytes, 0x3c)
+          $signature = [System.Text.Encoding]::ASCII.GetString($bytes, $peOffset, 4)
+          if ($signature -ne "PE`0`0") {
+            throw "Windows executable has an invalid PE signature."
+          }
+          $subsystem = [System.BitConverter]::ToUInt16($bytes, $peOffset + 24 + 68)
+          if ($subsystem -ne 2) {
+            throw "Expected Windows GUI subsystem 2, found $subsystem."
+          }
+          Write-Host "Verified Windows GUI subsystem 2 (no console window)."
+
+      - name: Verify bundled legal documents
+        run: node scripts/verify-bundle-legal.mjs ${{ matrix.target_root }}
