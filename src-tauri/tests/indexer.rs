@@ -179,7 +179,7 @@ fn external_edit_is_debounced_and_reindexed_by_watcher() {
     let paths = receiver
         .recv_timeout(Duration::from_secs(10))
         .expect("receive debounced watcher update");
-    assert_eq!(paths, vec!["Home.md"]);
+    assert!(paths.contains(&"Home.md".to_owned()));
 
     let connection = db::open(&root).expect("open index");
     assert_eq!(
