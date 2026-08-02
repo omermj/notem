@@ -1,6 +1,6 @@
 # Privacy
 
-NoteM is a local-first desktop application. It has no account system, telemetry, analytics, advertising, cloud synchronization, or automatic update check.
+NoteM is a local-first desktop application. It has no account system, telemetry, analytics, advertising, or cloud synchronization. The updater foundation does not perform a startup check or show update prompts in this phase.
 
 ## Data stored on the device
 
@@ -18,6 +18,8 @@ Deleting `.notem/` removes derived metadata and vault-specific settings, not the
 
 The application does not send notes, index contents, settings, usage data, or identifiers to the NoteM project. PDF.js resources, fonts, character maps, and English spellcheck dictionaries are bundled with the application and loaded locally.
 
+When an update check is explicitly requested by the updater service, the native Tauri updater contacts only the fixed HTTPS endpoint `https://github.com/omermj/notem/releases/latest/download/latest.json`. The native updater supplies the platform and installed-version information needed to select an artifact; NoteM does not send vault contents, note text, settings, or telemetry. Update signatures are verified against the public key bundled in the application. Settings migration alone does not contact the endpoint, and the webview does not make the updater request.
+
 When you deliberately activate an `http`, `https`, or `mailto` link, NoteM asks the operating system to open it in the default application. The destination application or website then operates under its own privacy policy. Unsupported URL schemes are not opened from rendered note content.
 
 Downloading NoteM, viewing the GitHub repository, or submitting an issue or security report takes place through GitHub and is subject to GitHub’s policies. Operating systems or distribution services may independently collect crash or reputation information; NoteM does not receive that data.
@@ -32,4 +34,4 @@ Uninstalling NoteM does not delete vaults. Remove vault files using normal files
 
 ## Changes
 
-Material privacy changes will be documented in the repository and release notes. Any future network service, telemetry, or updater would require an explicit documentation and consent review before release.
+Material privacy changes will be documented in the repository and release notes. The complete user-facing update experience and its consent/notification policy remain Phase 2 work.

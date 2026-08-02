@@ -13,6 +13,7 @@
   } from "../stores/settings.svelte";
   import { uiState } from "../stores/ui.svelte";
   import { vaultState } from "../stores/vault.svelte";
+  import { loadInstalledVersion, updaterState } from "../stores/updater.svelte";
   import projectLicense from "../../../LICENSE?raw";
   import thirdPartyNotices from "../../../THIRD_PARTY_NOTICES.md?raw";
 
@@ -28,6 +29,19 @@
   const templates = $derived(
     templatePaths(vaultState.tree, settingsState.templatesFolder),
   );
+  let versionLoadFailed = $state(false);
+  const aboutVersion = $derived(
+    versionLoadFailed
+      ? "Unavailable"
+      : (updaterState.installedVersion ?? "Loading…"),
+  );
+
+  $effect(() => {
+    if (updaterState.installedVersion !== null || versionLoadFailed) return;
+    void loadInstalledVersion().catch(() => {
+      versionLoadFailed = true;
+    });
+  });
 
   function close(): void {
     uiState.settingsOpen = false;
@@ -275,7 +289,7 @@
         {:else}
           <div class="about-panel">
             <span class="welcome-icon" aria-hidden="true">N</span>
-            <h3>NoteM 0.2.0</h3>
+            <h3>NoteM {aboutVersion}</h3>
             <p>A lightweight, local-first Markdown knowledge base.</p>
             <p>
               Your notes stay as plain files. No cloud, account, or telemetry.

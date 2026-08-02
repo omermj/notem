@@ -3,6 +3,7 @@
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_clipboard_manager::init())
+        .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_single_instance::init(|app, args, cwd| {
             use tauri::{Emitter, Manager};
             if let Some(window) = app.get_webview_window("main") {
@@ -19,6 +20,7 @@ fn main() {
         }))
         .plugin(tauri_plugin_window_state::Builder::default().build())
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(notem::commands::vault::CurrentVault::default())
         .manage(notem::commands::vault::CurrentWatcher::default())
         .manage(notem::commands::performance::PerformanceState::default())
@@ -48,6 +50,7 @@ fn main() {
             notem::commands::settings::settings_set,
             notem::commands::settings::vault_settings_get,
             notem::commands::settings::vault_settings_set,
+            notem::commands::updater::update_installation_capability,
             notem::commands::frontmatter::frontmatter_get,
             notem::commands::frontmatter::frontmatter_set,
             notem::commands::search::search_filename,

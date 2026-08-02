@@ -6,11 +6,14 @@ NoteM is a local desktop application. The installed application and its bundled
 frontend are trusted. Vault contents are untrusted: a vault may have been
 downloaded, shared, or modified by another process. NoteM must not let a vault
 path, Markdown document, attachment, symlink, or rendered link escape the
-selected vault or execute code.
+selected vault or execute code. Update metadata and signed artifacts come
+from the fixed HTTPS GitHub endpoint and are verified by the native updater
+against the embedded public key before installation.
 
 Note content remains in ordinary files. SQLite contains only derived metadata
 and can be deleted and rebuilt. NoteM has no account, telemetry service, cloud
-API, remote script, updater endpoint, or intentional external webview content.
+API, remote script, or intentional external webview content. The updater
+endpoint is a native-plugin boundary, not a webview resource.
 
 ## Filesystem containment
 
@@ -45,6 +48,13 @@ user gesture. Raw Markdown HTML is disabled, output is escaped, CSP blocks
 remote scripts and objects, and no external content is intentionally loaded in
 the webview, which reduces the likelihood. Short-lived Rust-issued selection
 handles remain a defense-in-depth option.
+
+The updater and process plugin permissions are granted only to the `main`
+window. Detached note and PDF windows retain only core permissions, so they
+cannot check, download, install, or restart for updates. The updater capability
+command only reports whether the current installation can be updated
+automatically; Windows and macOS support automatic installation, while Linux
+requires an AppImage and other installations use manual download.
 
 ## Rendered content and navigation
 

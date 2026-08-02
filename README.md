@@ -16,7 +16,7 @@ NoteM is pre-1.0 software under active development. The private `v0.2.0` build w
 
 ## Install
 
-Once `v0.2.1` is published, download the package for your platform from [GitHub Releases](https://github.com/omermj/notem/releases). NoteM does not update itself, so new versions must be downloaded manually.
+Once `v0.2.1` is published, download the package for your platform from [GitHub Releases](https://github.com/omermj/notem/releases). The updater foundation is present, but startup checks and the complete user-facing update experience are not enabled yet.
 
 ### Linux x86-64
 
@@ -139,14 +139,14 @@ The detailed trust boundaries and residual risks are documented in the
 
 ## Privacy
 
-NoteM has no account, telemetry, analytics, advertising, cloud synchronization, or automatic update check. Notes and attachments stay in the selected vault; derived search metadata stays in `<vault>/.notem/`. Application preferences are stored in the operating system’s application-config directory.
+NoteM has no account, telemetry, analytics, advertising, or cloud synchronization. Notes and attachments stay in the selected vault; derived search metadata stays in `<vault>/.notem/`. Application preferences are stored in the operating system’s application-config directory. The updater foundation uses a native HTTPS request to the fixed GitHub release metadata endpoint when explicitly invoked; it does not run at startup in this phase.
 
 HTTP, HTTPS, and email links leave NoteM only when you activate them and are handed to the operating system’s default application. PDF.js resources and spellcheck dictionaries are bundled and loaded locally. See the full [privacy statement](PRIVACY.md) and [threat model](docs/THREAT_MODEL.md).
 
 ## Known limitations
 
 - NoteM is pre-1.0; vault and settings migrations may still change between minor releases.
-- There is no synchronization, account system, end-to-end encryption, mobile app, plugin marketplace, collaborative editing, automatic updater, or PDF export.
+- There is no synchronization, account system, end-to-end encryption, mobile app, plugin marketplace, collaborative editing, complete user-facing updater experience, or PDF export.
 - Release signing and notarization are not configured. Review the disclosure and checksum instructions above.
 - Only the platforms and architectures in the support table are release targets.
 - Files above 10 MB open read-only, and PDFs are view-only.
