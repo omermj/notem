@@ -58,6 +58,7 @@ jobs:
           pnpm check
           pnpm lint
           pnpm test
+          pnpm test:release
           pnpm audit:theme
           pnpm build
 
