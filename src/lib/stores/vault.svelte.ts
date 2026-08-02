@@ -189,7 +189,10 @@ class VaultStore {
   async saveAll(): Promise<void> {
     await Promise.all(
       Object.values(this.files)
-        .filter((file) => file.dirty)
+        .filter(
+          (file) =>
+            file.dirty || file.saving || this.activeSaves.has(file.path),
+        )
         .map((file) => this.save(file.path)),
     );
   }

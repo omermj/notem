@@ -187,13 +187,16 @@ function installSystemThemeListener(): void {
 
 export async function updateSettings(
   patch: Partial<Omit<AppSettings, "lastVault">>,
-  options: { notifyOnError?: boolean } = {},
+  options: { notifyOnError?: boolean; throwOnError?: boolean } = {},
 ): Promise<void> {
   Object.assign(settingsState, patch);
   if (patch.theme !== undefined || patch.accentColor !== undefined)
     applyTheme();
   if (patch.hotkeys !== undefined) configureHotkeys(settingsState.hotkeys);
-  await persistSettings(options.notifyOnError !== false);
+  await persistSettings(
+    options.notifyOnError !== false,
+    options.throwOnError === true,
+  );
 }
 
 export async function setHotkey(id: string, hotkey: string): Promise<void> {
@@ -210,7 +213,10 @@ export async function resetHotkey(id: string): Promise<void> {
   await persistSettings();
 }
 
-async function persistSettings(notifyOnError = true): Promise<void> {
+async function persistSettings(
+  notifyOnError = true,
+  throwOnError = false,
+): Promise<void> {
   try {
     await settings_set({
       lastVault: settingsState.lastVault,
@@ -236,5 +242,6 @@ async function persistSettings(notifyOnError = true): Promise<void> {
     if (notifyOnError) {
       showToast(`Could not save settings: ${errorMessage(error)}`);
     }
+    if (throwOnError) throw error;
   }
 }

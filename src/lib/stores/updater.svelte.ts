@@ -1,8 +1,10 @@
-import { errorMessage } from "../api";
+import { vaultState } from "./vault.svelte";
 import { SvelteDate } from "svelte/reactivity";
+import type { UpdateCheckPreference } from "../api";
 import { settingsState, updateSettings } from "./settings.svelte";
 import { nativeUpdaterClient } from "../updater/client";
-import { normalizeVersion } from "../updater/types";
+import { normalizeVersion, userFacingUpdateError } from "../updater/types";
+import { automaticCheckIsDue } from "../updater/policy";
 import type {
   UpdateCheckResult,
   UpdateCheckSource,
@@ -16,12 +18,15 @@ import type {
 export interface UpdaterStoreOptions {
   client?: UpdaterClient;
   now?: () => string;
+  getUpdateCheckPreference?: () => UpdateCheckPreference;
+  getLastAutomaticUpdateAttemptAt?: () => string | null;
   getDismissedUpdateVersion?: () => string | null;
   persistSettings?: (patch: {
     lastAutomaticUpdateAttemptAt?: string | null;
     lastSuccessfulUpdateCheckAt?: string | null;
     dismissedUpdateVersion?: string | null;
   }) => Promise<void>;
+  prepareForInstallation?: () => Promise<void>;
 }
 
 const initialState = (): UpdaterState => ({
@@ -40,7 +45,10 @@ const initialState = (): UpdaterState => ({
 function defaultPersistSettings(
   patch: Parameters<NonNullable<UpdaterStoreOptions["persistSettings"]>>[0],
 ): Promise<void> {
-  return updateSettings(patch, { notifyOnError: false });
+  return updateSettings(patch, {
+    notifyOnError: false,
+    throwOnError: true,
+  });
 }
 
 export function createUpdaterStore(
@@ -48,16 +56,26 @@ export function createUpdaterStore(
 ): UpdaterStore {
   const client = options.client ?? nativeUpdaterClient;
   const now = options.now ?? (() => new SvelteDate().toISOString());
+  const getUpdateCheckPreference =
+    options.getUpdateCheckPreference ??
+    (() => settingsState.updateCheckPreference);
+  const getLastAutomaticUpdateAttemptAt =
+    options.getLastAutomaticUpdateAttemptAt ??
+    (() => settingsState.lastAutomaticUpdateAttemptAt);
   const getDismissedUpdateVersion =
     options.getDismissedUpdateVersion ??
     (() => settingsState.dismissedUpdateVersion);
   const persistSettings = options.persistSettings ?? defaultPersistSettings;
+  const prepareForInstallation =
+    options.prepareForInstallation ?? (() => vaultState.saveAll());
   const state = $state<UpdaterState>(initialState());
   let activeUpdate: UpdaterUpdate | null = null;
   let checkPromise: Promise<UpdateCheckResult> | null = null;
   let versionPromise: Promise<string> | null = null;
   let capabilityPromise: Promise<UpdateInstallationCapability> | null = null;
   let installationPromise: Promise<void> | null = null;
+  let automaticAttemptRecordedAt: string | null | undefined;
+  let dismissedUpdateVersionRecorded: string | null | undefined;
 
   async function closeActiveUpdate(): Promise<void> {
     const update = activeUpdate;
@@ -125,6 +143,16 @@ export function createUpdaterStore(
         error: "An update installation is already in progress",
       };
     }
+    if (
+      source === "background" &&
+      !automaticCheckIsDue(
+        getUpdateCheckPreference(),
+        automaticAttemptRecordedAt ?? getLastAutomaticUpdateAttemptAt(),
+        safeNow(),
+      )
+    ) {
+      return { started: false, source, status: "skipped", error: null };
+    }
 
     const pending = performCheck(source).finally(() => {
       if (checkPromise === pending) checkPromise = null;
@@ -141,21 +169,20 @@ export function createUpdaterStore(
     state.error = null;
     state.errorSource = null;
     state.progress = null;
-    await closeActiveUpdate();
-
-    if (source === "background") {
-      try {
-        await persistSettings({ lastAutomaticUpdateAttemptAt: now() });
-      } catch {
-        // A settings write must not prevent a background network check.
-      }
-    }
 
     try {
+      if (source === "background") {
+        // Record the attempt before touching the network. If this fails, the
+        // check is aborted so offline launches cannot repeatedly hammer GitHub.
+        const attemptAt = safeNow();
+        await persistSettings({ lastAutomaticUpdateAttemptAt: attemptAt });
+        automaticAttemptRecordedAt = attemptAt;
+      }
+      await closeActiveUpdate();
       const update = await client.checkForUpdate();
 
       if (!update) {
-        await persistSettings({ lastSuccessfulUpdateCheckAt: now() });
+        await persistBestEffort({ lastSuccessfulUpdateCheckAt: safeNow() });
         state.status = "upToDate";
         state.availableVersion = null;
         state.releaseNotes = null;
@@ -170,7 +197,7 @@ export function createUpdaterStore(
 
       if (version === stateDismissedVersion()) {
         await closeActiveUpdate();
-        await persistSettings({ lastSuccessfulUpdateCheckAt: now() });
+        await persistBestEffort({ lastSuccessfulUpdateCheckAt: safeNow() });
         state.status = "upToDate";
         state.availableVersion = null;
         state.releaseNotes = null;
@@ -178,12 +205,13 @@ export function createUpdaterStore(
         return { started: true, source, status: "upToDate", error: null };
       }
 
+      await loadInstallationCapability();
       updateAvailableState(update, version);
-      await persistSettings({ lastSuccessfulUpdateCheckAt: now() });
+      await persistBestEffort({ lastSuccessfulUpdateCheckAt: safeNow() });
       return { started: true, source, status: "available", error: null };
     } catch (error) {
       state.status = "error";
-      state.error = errorMessage(error);
+      state.error = userFacingUpdateError(error, "check");
       state.errorSource = source;
       state.availableVersion = null;
       state.releaseNotes = null;
@@ -194,10 +222,28 @@ export function createUpdaterStore(
     }
   }
 
+  function safeNow(): string {
+    const timestamp = now();
+    return Number.isFinite(Date.parse(timestamp))
+      ? timestamp
+      : new SvelteDate().toISOString();
+  }
+
+  async function persistBestEffort(
+    patch: Parameters<NonNullable<UpdaterStoreOptions["persistSettings"]>>[0],
+  ): Promise<void> {
+    try {
+      await persistSettings(patch);
+    } catch {
+      // A successful network check remains useful even if metadata cannot be saved.
+    }
+  }
+
   function stateDismissedVersion(): string | null {
     // The settings store owns the persisted value; the store only compares
     // normalized release versions at the updater boundary.
-    const dismissedVersion = getDismissedUpdateVersion();
+    const dismissedVersion =
+      dismissedUpdateVersionRecorded ?? getDismissedUpdateVersion();
     return dismissedVersion ? normalizeVersion(dismissedVersion) : null;
   }
 
@@ -211,7 +257,10 @@ export function createUpdaterStore(
     state.progress = null;
     state.error = null;
     state.errorSource = null;
-    if (version) await persistSettings({ dismissedUpdateVersion: version });
+    if (version) {
+      dismissedUpdateVersionRecorded = version;
+      await persistBestEffort({ dismissedUpdateVersion: version });
+    }
   }
 
   async function installAvailableUpdate(): Promise<void> {
@@ -237,6 +286,8 @@ export function createUpdaterStore(
         return;
       }
 
+      state.status = "installing";
+      await prepareForInstallation();
       state.status = "downloading";
       state.progress = { downloadedBytes: 0, totalBytes: null };
       await update.downloadAndInstall((event) => {
@@ -260,12 +311,17 @@ export function createUpdaterStore(
       state.availableVersion = null;
       state.releaseNotes = null;
       state.releaseDate = null;
-      await client.relaunch();
+      if (capability.relaunchAfterInstall !== false) {
+        await client.relaunch();
+      }
     } catch (error) {
       state.status = "error";
-      state.error = errorMessage(error);
+      state.error = userFacingUpdateError(error, "install");
       state.errorSource = null;
       state.progress = null;
+      state.availableVersion = null;
+      state.releaseNotes = null;
+      state.releaseDate = null;
       await closeActiveUpdate();
     }
   }
@@ -277,7 +333,7 @@ export function createUpdaterStore(
       await client.openReleasePage(version);
     } catch (error) {
       state.status = "error";
-      state.error = errorMessage(error);
+      state.error = userFacingUpdateError(error, "open");
       state.errorSource = null;
     }
   }

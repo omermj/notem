@@ -1,6 +1,7 @@
 import type {
   UpdateInstallationCapability,
   UpdateInstallationMode,
+  UpdateCheckPreference,
 } from "../api";
 
 export type UpdateStatus =
@@ -59,14 +60,7 @@ export interface UpdaterState {
 export interface UpdateCheckResult {
   started: boolean;
   source: UpdateCheckSource;
-  status: Exclude<
-    UpdateStatus,
-    | "idle"
-    | "checking"
-    | "downloading"
-    | "installing"
-    | "manualDownloadRequired"
-  >;
+  status: "skipped" | "upToDate" | "available" | "error";
   error: string | null;
 }
 
@@ -100,4 +94,74 @@ export function releasePageUrl(version: string): string | null {
   const normalized = normalizeVersion(version);
   if (!normalized) return null;
   return `${RELEASE_PAGE_BASE_URL}v${encodeURIComponent(normalized)}`;
+}
+
+export function releaseNotesSummary(
+  notes: string | null,
+  maxLength = 320,
+): string {
+  if (!notes) return "";
+  const compact = notes.trim().replace(/\s+/g, " ");
+  if (compact.length <= maxLength) return compact;
+  return `${compact.slice(0, Math.max(1, maxLength - 1)).trimEnd()}…`;
+}
+
+export function userFacingUpdateError(
+  error: unknown,
+  operation: "check" | "install" | "open" = "check",
+): string {
+  const message =
+    typeof error === "string"
+      ? error
+      : error instanceof Error
+        ? error.message
+        : "";
+  const normalized = message.toLowerCase();
+
+  if (
+    operation === "install" &&
+    /save|conflict|pending note/.test(normalized)
+  ) {
+    return "NoteM could not safely save your pending note changes, so the update was not installed.";
+  }
+  if (
+    operation === "install" &&
+    /signature|verify|verification|public key/.test(normalized)
+  ) {
+    return "The downloaded update could not be verified, so it was not installed.";
+  }
+  if (
+    /network|offline|timeout|timed out|connect|dns|fetch|request/.test(
+      normalized,
+    )
+  ) {
+    return "Could not reach GitHub to check for updates. Check your internet connection and try again.";
+  }
+  if (
+    /manifest|json|parse|invalid|malformed|version|deserialize|missing field|expected type/.test(
+      normalized,
+    )
+  ) {
+    return "GitHub returned release information that NoteM could not understand.";
+  }
+  if (operation === "open") {
+    return "Could not open the GitHub release page. Check your default browser and try again.";
+  }
+  if (operation === "install") {
+    return "NoteM could not install the update. Your current installation was not replaced.";
+  }
+  return "Could not check for updates right now. Try again later.";
+}
+
+export function updatePreferenceLabel(
+  preference: UpdateCheckPreference,
+): string {
+  switch (preference) {
+    case "automatic":
+      return "Automatic checks enabled";
+    case "manual":
+      return "Manual checks only";
+    case "unset":
+      return "Not chosen yet";
+  }
 }

@@ -4,6 +4,7 @@
   import { getCurrentWebview } from "@tauri-apps/api/webview";
   import { getCurrentWindow } from "@tauri-apps/api/window";
   import { onMount, tick } from "svelte";
+  import { SvelteDate } from "svelte/reactivity";
   import WorkspaceNode from "./lib/components/WorkspaceNode.svelte";
   import FileExplorer from "./lib/components/FileExplorer.svelte";
   import SearchPane from "./lib/components/SearchPane.svelte";
@@ -15,6 +16,8 @@
   import QuickSwitcher from "./lib/components/QuickSwitcher.svelte";
   import Ribbon from "./lib/components/Ribbon.svelte";
   import SettingsModal from "./lib/components/SettingsModal.svelte";
+  import UpdateBanner from "./lib/components/UpdateBanner.svelte";
+  import UpdateConsent from "./lib/components/UpdateConsent.svelte";
   import TemplatePicker from "./lib/components/TemplatePicker.svelte";
   import ConflictModal from "./lib/components/ConflictModal.svelte";
   import VaultUnavailableModal from "./lib/components/VaultUnavailableModal.svelte";
@@ -72,8 +75,12 @@
     uiState,
   } from "./lib/stores/ui.svelte";
   import { vaultState } from "./lib/stores/vault.svelte";
+  import { updaterStore } from "./lib/stores/updater.svelte";
+  import { updaterStartupAction } from "./lib/updater/policy";
 
   let openingVault = $state(false);
+  let updaterStartupReady = $state(false);
+  let updaterStartupStarted = false;
   let lastAssociatedFile = "";
   const currentTab = $derived(activeTab());
   const noteTitle = $derived(
@@ -175,6 +182,13 @@
     try {
       const settings = await loadSettings();
       applyTheme();
+      const detachedWindow = new URLSearchParams(window.location.search).has(
+        "detached",
+      );
+      if (!detachedWindow) {
+        updaterStartupReady = true;
+        void startUpdaterAfterUiReady();
+      }
       const associated = await startup_file();
       if (associated) {
         await openAssociatedFile(associated);
@@ -197,6 +211,22 @@
       } else {
         showToast(`Could not reopen the last vault: ${errorMessage(error)}`);
       }
+    }
+  }
+
+  async function startUpdaterAfterUiReady(): Promise<void> {
+    if (updaterStartupStarted) return;
+    await tick();
+    if (updaterStartupStarted) return;
+    updaterStartupStarted = true;
+    if (
+      updaterStartupAction(
+        settingsState.updateCheckPreference,
+        settingsState.lastAutomaticUpdateAttemptAt,
+        new SvelteDate().toISOString(),
+      ) === "backgroundCheck"
+    ) {
+      void updaterStore.checkForUpdateInBackground();
     }
   }
 
@@ -621,6 +651,8 @@
   {/if}
 </div>
 
+<UpdateConsent visible={updaterStartupReady} />
+<UpdateBanner />
 <CommandPalette />
 <QuickSwitcher />
 <TemplatePicker />

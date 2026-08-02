@@ -80,6 +80,8 @@ export type UpdateInstallationMode = "automatic" | "manualDownloadOnly";
 
 export interface UpdateInstallationCapability {
   mode: UpdateInstallationMode;
+  /** Windows installer flows shut the current process down themselves. */
+  relaunchAfterInstall?: boolean;
 }
 
 export type PropertyValueType =

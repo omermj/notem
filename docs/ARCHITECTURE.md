@@ -36,8 +36,9 @@ A vault is an ordinary directory. Markdown files and attachments are durable use
 - `frontmatter.rs` reads and rewrites ordered YAML properties.
 - `settings.rs` persists application and vault settings.
 - `updater.rs` reports whether the current installation supports automatic
-  update installation; updater checks and installs remain behind the native
-  Tauri updater plugin.
+  update installation and whether the native installer owns the post-install
+  process shutdown; updater checks and installs remain behind the native Tauri
+  updater plugin.
 - `index.rs`, `performance.rs`, `startup.rs`, and `window.rs` expose supporting lifecycle behavior.
 
 `src-tauri/src/vault_path.rs` is the filesystem containment boundary. Commands use it to canonicalize the vault, reject traversal and symlink escapes, and safely resolve existing or new destinations. The security assumptions and residual pathname race are documented in [THREAT_MODEL.md](THREAT_MODEL.md).
@@ -63,11 +64,20 @@ Rust emits `notem://file-changed`, `notem://index-updated`, progress, and vault-
 
 SQLite is never authoritative for notes. Schema mismatch, corruption, or deletion is handled by recreating the derived index from files.
 
-Updater checks are not triggered during application startup in this phase.
-When invoked, the native updater uses the configured HTTPS endpoint and
-embedded public key; update notes remain plain text in frontend state. Linux
-DEB and other non-AppImage installations expose a manual-download path because
-the Tauri updater cannot replace them in place.
+After settings load and the primary UI renders, an unset preference shows a
+non-blocking consent panel. Automatic preference starts a background check only
+when no automatic attempt was recorded in the preceding rolling 24 hours; the
+attempt is persisted before the native request begins. Manual checks bypass the
+throttle. Background errors and up-to-date results remain quiet, while manual
+results are presented in Settings → About. The native updater uses the
+configured HTTPS endpoint and embedded public key; release notes remain
+escaped plain text in frontend state. A newer version is shown in an in-app
+banner and is never downloaded or installed without an explicit user action.
+Linux AppImage installations use normal Tauri installation. Debian and other
+non-AppImage Linux installations check and notify normally but open the fixed
+GitHub release page for a manual download. Before automatic installation, the
+frontend flushes all dirty notes through the existing vault save mechanism and
+blocks installation if that save cannot be confirmed.
 
 ## Security boundaries
 

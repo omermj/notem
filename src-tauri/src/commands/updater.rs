@@ -15,19 +15,26 @@ pub enum UpdateInstallationMode {
 #[serde(rename_all = "camelCase")]
 pub struct UpdateInstallationCapability {
     pub mode: UpdateInstallationMode,
+    pub relaunch_after_install: bool,
 }
 
 fn installation_capability_for(
     target_os: &str,
     running_appimage: bool,
 ) -> UpdateInstallationCapability {
-    let mode = match target_os {
-        "windows" | "macos" => UpdateInstallationMode::Automatic,
-        "linux" if running_appimage => UpdateInstallationMode::Automatic,
-        _ => UpdateInstallationMode::ManualDownloadOnly,
+    let (mode, relaunch_after_install) = match target_os {
+        // The Windows updater launches the installer and exits the current
+        // process itself, so a second relaunch would be unsafe.
+        "windows" => (UpdateInstallationMode::Automatic, false),
+        "macos" => (UpdateInstallationMode::Automatic, true),
+        "linux" if running_appimage => (UpdateInstallationMode::Automatic, true),
+        _ => (UpdateInstallationMode::ManualDownloadOnly, false),
     };
 
-    UpdateInstallationCapability { mode }
+    UpdateInstallationCapability {
+        mode,
+        relaunch_after_install,
+    }
 }
 
 #[tauri::command]
@@ -58,10 +65,12 @@ mod tests {
             installation_capability_for("windows", false).mode,
             UpdateInstallationMode::Automatic
         );
+        assert!(!installation_capability_for("windows", false).relaunch_after_install);
         assert_eq!(
             installation_capability_for("macos", false).mode,
             UpdateInstallationMode::Automatic
         );
+        assert!(installation_capability_for("macos", false).relaunch_after_install);
     }
 
     #[test]
@@ -70,10 +79,12 @@ mod tests {
             installation_capability_for("linux", true).mode,
             UpdateInstallationMode::Automatic
         );
+        assert!(installation_capability_for("linux", true).relaunch_after_install);
         assert_eq!(
             installation_capability_for("linux", false).mode,
             UpdateInstallationMode::ManualDownloadOnly
         );
+        assert!(!installation_capability_for("linux", false).relaunch_after_install);
     }
 
     #[test]
