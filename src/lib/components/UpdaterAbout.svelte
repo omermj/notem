@@ -27,7 +27,8 @@
       (updaterState.status === "available" ||
         updaterState.status === "manualDownloadRequired" ||
         updaterState.status === "downloading" ||
-        updaterState.status === "installing"),
+        updaterState.status === "installing" ||
+        updaterState.status === "restartRequired"),
   );
   const busy = $derived(
     manualCheckPending ||
@@ -89,6 +90,8 @@
         return "Installing update";
       case "manualDownloadRequired":
         return "Download from GitHub";
+      case "restartRequired":
+        return "Restart NoteM manually";
       default:
         return "Not checked yet";
     }
@@ -205,6 +208,10 @@
       <p class="update-about-hint">
         This installation will use the fixed GitHub release page for
         downloading.
+      </p>
+    {:else if updaterState.status === "restartRequired"}
+      <p class="update-about-warning">
+        The update was installed. Restart NoteM manually to finish.
       </p>
     {:else}
       <p class="update-about-warning">

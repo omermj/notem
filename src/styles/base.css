@@ -1216,7 +1216,10 @@ body.resizing-workspace {
 .properties-body {
   display: grid;
   gap: 3px;
+  margin: 0;
+  border: 0;
   padding: 2px 8px 10px;
+  min-width: 0;
 }
 
 .property-row {

@@ -110,6 +110,10 @@
   });
 
   $effect(() => {
+    editor?.setReadOnly(vaultState.updateInstallationLocked);
+  });
+
+  $effect(() => {
     editor?.updateSettings({
       fontSize: settingsState.editorFontSize,
       font: settingsState.editorFont,
@@ -147,6 +151,7 @@
     )
       return;
     handledInsertion = insertion.id;
+    if (vaultState.updateInstallationLocked) return;
     if (insertion.clientX !== undefined && insertion.clientY !== undefined) {
       const position = editor?.view.posAtCoords({
         x: insertion.clientX,
@@ -165,6 +170,7 @@
   }
 
   async function importPastedFiles(files: File[]): Promise<void> {
+    if (vaultState.updateInstallationLocked) return;
     let imported = false;
     for (const [index, file] of files.entries()) {
       try {
@@ -225,7 +231,7 @@
   }
 
   function insertDraggedItem(payload: NotemDrag, point: DragPoint): void {
-    if (!editor) return;
+    if (!editor || vaultState.updateInstallationLocked) return;
     const draggedMedia = draggedMediaPath(payload);
     const draggedNote = draggedNotePath(payload);
     const relativeMedia = draggedMedia

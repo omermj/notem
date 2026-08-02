@@ -11,6 +11,7 @@ export type UpdateStatus =
   | "available"
   | "downloading"
   | "installing"
+  | "restartRequired"
   | "manualDownloadRequired"
   | "error";
 
@@ -78,13 +79,12 @@ export interface UpdaterStore {
 
 export type { UpdateInstallationCapability, UpdateInstallationMode };
 
-const semverPattern =
-  /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/;
+const stableVersionPattern = /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)$/;
 
 export function normalizeVersion(value: string): string | null {
   const trimmed = value.trim();
   const withoutPrefix = /^[vV]/.test(trimmed) ? trimmed.slice(1) : trimmed;
-  return semverPattern.test(withoutPrefix) ? withoutPrefix : null;
+  return stableVersionPattern.test(withoutPrefix) ? withoutPrefix : null;
 }
 
 export const RELEASE_PAGE_BASE_URL =

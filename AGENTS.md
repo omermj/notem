@@ -1,62 +1,96 @@
-# NoteM repository guidance
+# AGENTS.md — NoteM
 
-NoteM is a local-first Tauri 2 desktop application for a folder of Markdown notes. It has no account, cloud sync, telemetry, or intentional remote application content.
+## Project Overview
 
-## Repository map
+NoteM is a lightweight, local-first, cross-platform (Linux, macOS ARM, Windows) Markdown knowledge-base app. The vault is a plain folder of `.md` files. All indexes are derived, disposable caches. No cloud, no account, no telemetry.
 
-```text
-src/                         Svelte 5 + TypeScript frontend
-  App.svelte                 application shell and workspace composition
-  lib/api.ts                 typed Tauri command wrappers; the invoke boundary
-  lib/stores/                vault, UI, graph, and settings state
-  lib/components/            focused UI components
-  lib/editor/                CodeMirror 6 setup and live preview
-  lib/markdown/              markdown-it rendering and extensions
-  styles/                    plain CSS themes and shared variables
-src-tauri/                   Rust backend and Tauri configuration
-  src/commands/              IPC command handlers
-  src/index/                 SQLite schema, parser, scans, and watcher
-  src/vault_path.rs            filesystem containment boundary
-  capabilities/              window-scoped Tauri permissions
-  tests/                      Rust integration and performance tests
-docs/                        architecture, threat model, and release guidance
-.github/workflows/           CI, native validation, and draft-release automation
-scripts/                     repository validation utilities
+## Tech Stack (fixed — do not substitute)
+
+| Layer           | Choice                                 | Notes                                                             |
+| --------------- | -------------------------------------- | ----------------------------------------------------------------- |
+| App shell       | Tauri 2 (Rust, stable)                 | Single binary per platform                                        |
+| Frontend        | Svelte 5 + TypeScript + Vite           | Use runes ($state, $derived, $effect)                             |
+| Editor          | CodeMirror 6                           | `@codemirror/lang-markdown`, custom decorations for live preview  |
+| Markdown render | markdown-it (reading view)             | Plugins: wikilinks (custom), tags (custom), footnotes, task lists |
+| Index/DB        | SQLite via `rusqlite` (bundled) + FTS5 | Stored at `<vault>/.notem/index.db`                               |
+| File watching   | `notify` crate (debounced 300ms)       | Rust side only                                                    |
+| Graph view      | d3-force + Canvas rendering            | No SVG for graphs (perf)                                          |
+| State (UI)      | Svelte stores/runes only               | No Redux-like libs                                                |
+| Styling         | Plain CSS with CSS custom properties   | Theming via variables; no Tailwind                                |
+| Package manager | pnpm                                   |                                                                   |
+
+## Repository Layout
+
+```
+notem/
+├── AGENTS.md
+├── package.json / pnpm-lock.yaml
+├── vite.config.ts
+├── src/                      # Svelte frontend
+│   ├── main.ts
+│   ├── App.svelte
+│   ├── lib/
+│   │   ├── api.ts            # ALL invoke() calls wrapped here — only file allowed to call invoke
+│   │   ├── stores/           # vault.svelte.ts, ui.svelte.ts, settings.svelte.ts
+│   │   ├── editor/           # CodeMirror setup, extensions, live-preview decorations
+│   │   ├── components/       # FileExplorer, TabBar, SearchPane, BacklinksPane, TagPane, Outline, GraphView, CommandPalette, QuickSwitcher, StatusBar, Modal
+│   │   └── markdown/         # markdown-it config, wikilink & tag plugins
+│   └── styles/               # base.css, themes/light.css, themes/dark.css
+├── src-tauri/
+│   ├── tauri.conf.json
+│   ├── Cargo.toml
+│   └── src/
+│       ├── main.rs
+│       ├── commands/         # vault.rs, files.rs, search.rs, links.rs, tags.rs, settings.rs
+│       ├── index/            # db.rs (schema+migrations), parser.rs (md scanning), watcher.rs
+│       └── error.rs          # single AppError type, thiserror
+└── tests/                    # Rust integration tests live in src-tauri/tests/
 ```
 
-The core stack is fixed: Rust and Tauri 2, Svelte 5, strict TypeScript, Vite, CodeMirror 6, markdown-it, bundled rusqlite with FTS5, d3-force with Canvas rendering, plain CSS, and pnpm.
+## Architecture Rules (non-negotiable)
 
-## Stable invariants
+1. **Files are the database.** Never store note content in SQLite — only derived metadata (paths, links, tags, headings, FTS index). Deleting `.notem/` must be fully recoverable by re-indexing.
+2. **All FS and index operations happen in Rust.** Frontend never touches the filesystem directly; it calls Tauri commands via `src/lib/api.ts`.
+3. **Event-driven sync.** Rust watcher detects external changes → re-indexes changed file → emits `notem://file-changed`, `notem://index-updated` events → frontend updates stores.
+4. **Paths:** vault-relative, forward slashes, always. Convert at the Rust boundary. Note identity = vault-relative path without `.md` extension.
+5. **Wikilink resolution:** `[[Name]]` resolves case-insensitively to (a) exact relative path, (b) unique filename match anywhere in vault, (c) unresolved (render as dashed "unresolved" link that creates the note on click).
+6. **Errors:** Rust commands return `Result<T, AppError>`; frontend shows toast notifications, never crashes.
+7. **Performance targets:** cold start < 1s; open 5k-file vault index < 3s; typing latency < 16ms; search < 100ms.
 
-- Markdown notes and vault attachments are the durable source of truth. SQLite stores only disposable derived metadata and FTS content; deleting `.notem/` must leave source notes intact and allow the index to be rebuilt. Vault-specific workspace settings may also live in `.notem/settings.json`.
-- Filesystem and index operations happen in Rust. Frontend code does not access the filesystem directly, and frontend Tauri `invoke()` calls are routed through `src/lib/api.ts`.
-- Vault paths are relative, use `/` on every platform, and are validated at the Rust boundary. Note identity is the vault-relative path without `.md`.
-- External file changes are re-indexed by the Rust watcher and surfaced through `notem://` events. Frontend state refreshes from those events rather than treating SQLite as authoritative.
-- Wikilinks resolve case-insensitively by exact relative path, then by a unique filename match; unresolved links remain visibly unresolved and can create the note when activated.
-- Rust command handlers return `Result<T, AppError>` and remain Clippy-clean; command handlers must not use `unwrap()`. Frontend failures become user-visible notifications rather than crashes.
-- Preserve the existing performance targets: cold start under 1 second, opening a 5,000-file vault index under 3 seconds, typing latency under 16 ms, and search under 100 ms.
-- Do not add cloud sync, accounts, telemetry, mobile, collaborative editing, encryption, or other unrelated product features.
+## SQLite Schema (create in Phase 2, do not deviate)
 
-## Documentation map
+```sql
+CREATE TABLE files(id INTEGER PRIMARY KEY, path TEXT UNIQUE NOT NULL, title TEXT, mtime INTEGER, size INTEGER);
+CREATE TABLE links(id INTEGER PRIMARY KEY, source_id INTEGER REFERENCES files(id) ON DELETE CASCADE, target_path TEXT NOT NULL, target_id INTEGER NULL, display TEXT, pos INTEGER);
+CREATE TABLE tags(id INTEGER PRIMARY KEY, file_id INTEGER REFERENCES files(id) ON DELETE CASCADE, tag TEXT NOT NULL);
+CREATE TABLE headings(id INTEGER PRIMARY KEY, file_id INTEGER REFERENCES files(id) ON DELETE CASCADE, level INTEGER, text TEXT, line INTEGER);
+CREATE TABLE frontmatter(id INTEGER PRIMARY KEY, file_id INTEGER REFERENCES files(id) ON DELETE CASCADE, key TEXT, value TEXT);
+CREATE VIRTUAL TABLE fts USING fts5(path, title, body, tokenize='porter unicode61');
+CREATE TABLE meta(key TEXT PRIMARY KEY, value TEXT); -- schema_version, etc.
+```
 
-Read the applicable documents before editing across a boundary:
+## Tauri Command Naming
 
-| Change                                                  | Read first                                                                  |
-| ------------------------------------------------------- | --------------------------------------------------------------------------- |
-| Architecture or data-flow changes                       | `docs/ARCHITECTURE.md`, `CONTRIBUTING.md`                                   |
-| Security, IPC, URL handling, CSP, or Tauri capabilities | `docs/THREAT_MODEL.md`, `docs/ARCHITECTURE.md`, and the nearest `AGENTS.md` |
-| Network behavior or privacy                             | `PRIVACY.md`, `docs/THREAT_MODEL.md`                                        |
-| Releases or GitHub Actions                              | `docs/RELEASING.md`, `.github/AGENTS.md`, and the affected workflow         |
-| Contributor-facing instructions or policy               | `CONTRIBUTING.md`, `README.md`, and the affected policy document            |
+Snake_case, grouped by module: `vault_open`, `vault_list`, `file_read`, `file_write`, `file_create`, `file_rename`, `file_delete`, `file_move`, `search_fts`, `search_filename`, `links_backlinks`, `links_graph`, `tags_all`, `settings_get`, `settings_set`, `index_rebuild`.
 
-## Task protocol
+## Coding Conventions
 
-1. Inspect existing patterns before editing.
-2. Keep the change scoped to the requested feature.
-3. Use targeted tests while iterating.
-4. Run the appropriate complete local gate before declaring the task finished.
-5. Do not claim native-platform validation that was not actually performed.
-6. Do not push, publish releases, modify repository settings, or expose secrets unless explicitly instructed.
-7. End with changed files, tests run, failures or omissions, and remaining manual validation.
+- Rust: `rustfmt` defaults, `clippy` clean, `thiserror` for errors, no `unwrap()` in command handlers.
+- TS: strict mode, no `any`, ESLint + Prettier defaults.
+- Svelte: one component per file; components < 300 lines; business logic in stores, not components.
+- Commits: conventional commits (`feat:`, `fix:`, `refactor:`).
+- Every phase must compile (`pnpm tauri dev` works) and pass `cargo test` before it is considered done.
 
-Use the nearest nested `AGENTS.md` for frontend, Rust/Tauri, and GitHub-specific rules. For documentation-only changes, run the repository’s applicable documentation formatting check; for code or workflow changes, use the complete gate documented in `CONTRIBUTING.md` and the relevant workflow.
+## Settings
+
+App settings JSON at platform config dir (`tauri-plugin-store` or manual): last vault path, theme, editor prefs. Vault-specific settings at `<vault>/.notem/settings.json`.
+
+## Testing
+
+- Rust: unit tests for parser (wikilinks/tags/headings/frontmatter extraction), integration tests for indexer against a fixture vault in `src-tauri/tests/fixtures/vault/`.
+- Frontend: keep logic testable in pure TS modules; Vitest for `markdown/` and store logic.
+- Record platform-specific manual validation in the pull request and release checklist.
+
+## Out of Scope (do NOT build)
+
+Sync/cloud, plugins marketplace, mobile, collaborative editing, PDF export (until told), encryption.

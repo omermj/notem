@@ -4,7 +4,7 @@ import type { UpdateCheckPreference } from "../api";
 import { settingsState, updateSettings } from "./settings.svelte";
 import { nativeUpdaterClient } from "../updater/client";
 import { normalizeVersion, userFacingUpdateError } from "../updater/types";
-import { automaticCheckIsDue } from "../updater/policy";
+import { automaticCheckPolicy } from "../updater/policy";
 import type {
   UpdateCheckResult,
   UpdateCheckSource,
@@ -26,7 +26,7 @@ export interface UpdaterStoreOptions {
     lastSuccessfulUpdateCheckAt?: string | null;
     dismissedUpdateVersion?: string | null;
   }) => Promise<void>;
-  prepareForInstallation?: () => Promise<void>;
+  prepareForInstallation?: () => Promise<() => void>;
 }
 
 const initialState = (): UpdaterState => ({
@@ -67,7 +67,8 @@ export function createUpdaterStore(
     (() => settingsState.dismissedUpdateVersion);
   const persistSettings = options.persistSettings ?? defaultPersistSettings;
   const prepareForInstallation =
-    options.prepareForInstallation ?? (() => vaultState.saveAll());
+    options.prepareForInstallation ??
+    (() => vaultState.prepareForUpdateInstallation());
   const state = $state<UpdaterState>(initialState());
   let activeUpdate: UpdaterUpdate | null = null;
   let checkPromise: Promise<UpdateCheckResult> | null = null;
@@ -143,15 +144,25 @@ export function createUpdaterStore(
         error: "An update installation is already in progress",
       };
     }
-    if (
-      source === "background" &&
-      !automaticCheckIsDue(
+    if (source === "background") {
+      const currentTime = safeNow();
+      const policy = automaticCheckPolicy(
         getUpdateCheckPreference(),
         automaticAttemptRecordedAt ?? getLastAutomaticUpdateAttemptAt(),
-        safeNow(),
-      )
-    ) {
-      return { started: false, source, status: "skipped", error: null };
+        currentTime,
+      );
+      if (policy === "resetFuture") {
+        try {
+          await persistSettings({ lastAutomaticUpdateAttemptAt: currentTime });
+          automaticAttemptRecordedAt = currentTime;
+        } catch {
+          // A clock correction must never turn into an unrecorded request.
+        }
+        return { started: false, source, status: "skipped", error: null };
+      }
+      if (policy !== "due") {
+        return { started: false, source, status: "skipped", error: null };
+      }
     }
 
     const pending = performCheck(source).finally(() => {
@@ -248,6 +259,11 @@ export function createUpdaterStore(
   }
 
   async function dismissAvailableUpdate(): Promise<void> {
+    if (
+      state.status !== "available" &&
+      state.status !== "manualDownloadRequired"
+    )
+      return;
     const version = state.availableVersion;
     await closeActiveUpdate();
     state.status = "idle";
@@ -277,6 +293,7 @@ export function createUpdaterStore(
     const version = state.availableVersion;
     if (!update || !version || state.status !== "available") return;
 
+    let releaseInstallationLock: (() => void) | null = null;
     try {
       const capability = await loadInstallationCapability();
       if (capability.mode !== "automatic") {
@@ -287,7 +304,7 @@ export function createUpdaterStore(
       }
 
       state.status = "installing";
-      await prepareForInstallation();
+      releaseInstallationLock = await prepareForInstallation();
       state.status = "downloading";
       state.progress = { downloadedBytes: 0, totalBytes: null };
       await update.downloadAndInstall((event) => {
@@ -312,9 +329,19 @@ export function createUpdaterStore(
       state.releaseNotes = null;
       state.releaseDate = null;
       if (capability.relaunchAfterInstall !== false) {
-        await client.relaunch();
+        try {
+          await client.relaunch();
+        } catch {
+          releaseInstallationLock();
+          releaseInstallationLock = null;
+          state.status = "restartRequired";
+          state.error =
+            "The update was installed, but NoteM could not restart automatically. Restart NoteM manually to finish.";
+          state.errorSource = null;
+        }
       }
     } catch (error) {
+      releaseInstallationLock?.();
       state.status = "error";
       state.error = userFacingUpdateError(error, "install");
       state.errorSource = null;

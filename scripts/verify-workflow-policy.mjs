@@ -187,6 +187,7 @@ function assertReleaseControls(releaseWorkflow) {
     "pnpm tauri build",
     "scripts/generate-updater-manifest.mjs",
     "scripts/generate-sha256sums.mjs",
+    "scripts/verify-release-assets.mjs",
   ];
   for (const fragment of requiredFragments) {
     if (!releaseWorkflow.includes(fragment)) {

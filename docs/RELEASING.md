@@ -4,7 +4,7 @@ Normal pull-request and `main` branch CI runs on one Linux runner and does not b
 
 ## 1. Choose and apply the version
 
-Use the selected semantic version `0.2.1` (or the next version selected for a later release), with a Git tag prefixed by `v`.
+Use the selected stable semantic version `0.2.1` (or the next version selected for a later release), with an exact `vX.Y.Z` Git tag. The updater release workflow intentionally rejects prerelease and build-metadata tags.
 
 Update the version in all three files:
 

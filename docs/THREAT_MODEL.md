@@ -67,9 +67,10 @@ relaunch on that platform.
 The first-run consent panel is non-blocking and makes the network boundary
 explicit. Automatic checks are recorded before their request and are limited
 to one attempt per rolling 24 hours; manual checks bypass that limit. Invalid
-or future timestamps do not permanently suppress a check. Background errors
-are suppressed in the routine UI, and no operating-system notification is
-used.
+timestamps are discarded. If the application clock moves behind a recorded
+attempt, NoteM rebases the timestamp to the current clock without making a
+request, preserving the 24-hour privacy throttle. Background errors are
+suppressed in the routine UI, and no operating-system notification is used.
 
 Release notes and manifest strings are untrusted text and are rendered through
 normal escaped Svelte text interpolation; they are never inserted as HTML.

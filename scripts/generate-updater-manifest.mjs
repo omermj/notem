@@ -5,12 +5,7 @@ import { fileURLToPath } from "node:url";
 const APP_NAME = "NoteM";
 const REPOSITORY = "omermj/notem";
 const DEFAULT_DOWNLOAD_BASE = `https://github.com/${REPOSITORY}/releases/download`;
-const NUMERIC_IDENTIFIER = "(?:0|[1-9][0-9]*)";
-const NON_NUMERIC_IDENTIFIER = "[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*";
-const PRERELEASE_IDENTIFIER = `(?:${NUMERIC_IDENTIFIER}|${NON_NUMERIC_IDENTIFIER})`;
-const VERSION_PATTERN = new RegExp(
-  `^(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)\\.(0|[1-9][0-9]*)(?:-${PRERELEASE_IDENTIFIER}(?:\\.${PRERELEASE_IDENTIFIER})*)?(?:\\+[0-9A-Za-z-]+(?:\\.[0-9A-Za-z-]+)*)?$`,
-);
+const VERSION_PATTERN = /^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$/;
 const TAG_PATTERN = /^v(.+)$/;
 const RFC3339_PATTERN =
   /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/;
@@ -191,7 +186,10 @@ async function collectUpdaterFiles(artifactsDirectory, version) {
     if (matches.length > 1) {
       throw manifestError(`duplicate updater artifact: ${name}`);
     }
-    const stats = await fs.stat(matches[0]);
+    const stats = await fs.lstat(matches[0]);
+    if (!stats.isFile()) {
+      throw manifestError(`updater artifact is not a regular file: ${name}`);
+    }
     if (stats.size === 0) {
       throw manifestError(`zero-byte updater artifact: ${name}`);
     }
@@ -211,13 +209,25 @@ function validatePublicationDate(publicationDate) {
     ? match[0].slice(0, 10).split("-").map(Number)
     : [];
   const calendarDate = match && new Date(Date.UTC(year, month - 1, day));
+  const timeMatch = match
+    ? /T(\d{2}):(\d{2}):(\d{2})(?:\.\d+)?(?:Z|[+-](\d{2}):(\d{2}))$/.exec(
+        match[0],
+      )
+    : null;
+  const [, hour, minute, second, offsetHour = "0", offsetMinute = "0"] =
+    timeMatch ?? [];
   if (
     !match ||
     Number.isNaN(parsed) ||
     !calendarDate ||
     calendarDate.getUTCFullYear() !== year ||
     calendarDate.getUTCMonth() !== month - 1 ||
-    calendarDate.getUTCDate() !== day
+    calendarDate.getUTCDate() !== day ||
+    Number(hour) > 23 ||
+    Number(minute) > 59 ||
+    Number(second) > 60 ||
+    Number(offsetHour) > 23 ||
+    Number(offsetMinute) > 59
   ) {
     throw manifestError("publication date must be a valid RFC 3339 timestamp.");
   }

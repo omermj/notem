@@ -9,14 +9,13 @@ import {
 describe("updater version helpers", () => {
   it("normalizes supported release versions", () => {
     expect(normalizeVersion(" v1.2.3 ")).toBe("1.2.3");
-    expect(normalizeVersion("1.2.3-beta.1+build.7")).toBe(
-      "1.2.3-beta.1+build.7",
-    );
   });
 
   it("rejects unsafe release tags", () => {
     expect(normalizeVersion("../../settings")).toBeNull();
     expect(normalizeVersion("1.2")).toBeNull();
+    expect(normalizeVersion("1.2.3-beta.1")).toBeNull();
+    expect(normalizeVersion("1.2.3+build.7")).toBeNull();
     expect(releasePageUrl("1.2.3#notes")).toBeNull();
   });
 

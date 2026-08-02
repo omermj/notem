@@ -36,17 +36,19 @@
 
   async function save(): Promise<void> {
     const file = vaultState.files[path];
-    if (!file || saving) return;
+    if (!file || saving || vaultState.updateInstallationLocked) return;
     saving = true;
     try {
-      await vaultState.save(path);
-      const current = vaultState.files[path];
-      const result = await frontmatter_set(
-        path,
-        $state.snapshot(properties),
-        current.mtime,
-      );
-      vaultState.replaceContent(path, result.content, result.mtime);
+      await vaultState.runEditOperation(async () => {
+        await vaultState.save(path);
+        const current = vaultState.files[path];
+        const result = await frontmatter_set(
+          path,
+          $state.snapshot(properties),
+          current.mtime,
+        );
+        vaultState.replaceContent(path, result.content, result.mtime);
+      });
     } catch (error) {
       showToast(errorMessage(error));
       await load();
@@ -127,7 +129,10 @@
     {/if}
   </button>
   {#if !collapsed}
-    <div class="properties-body">
+    <fieldset
+      class="properties-body"
+      disabled={vaultState.updateInstallationLocked}
+    >
       {#if loading}
         <p class="properties-empty">Loading properties…</p>
       {:else}
@@ -255,6 +260,6 @@
           <span>Add property</span>
         </button>
       {/if}
-    </div>
+    </fieldset>
   {/if}
 </section>

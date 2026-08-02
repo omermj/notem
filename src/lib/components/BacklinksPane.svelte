@@ -57,21 +57,23 @@
     if (linking) return;
     linking = key;
     try {
-      await vaultState.save(mention.path);
-      await links_link_unlinked(
-        mention.path,
-        mention.start,
-        mention.end,
-        mention.text,
-      );
-      const fresh = await file_read(mention.path);
-      const open = vaultState.files[mention.path];
-      if (open) {
-        open.content = fresh.content;
-        open.mtime = fresh.mtime;
-        open.dirty = false;
-      }
-      uiState.indexRevision += 1;
+      await vaultState.runEditOperation(async () => {
+        await vaultState.save(mention.path);
+        await links_link_unlinked(
+          mention.path,
+          mention.start,
+          mention.end,
+          mention.text,
+        );
+        const fresh = await file_read(mention.path);
+        const open = vaultState.files[mention.path];
+        if (open) {
+          open.content = fresh.content;
+          open.mtime = fresh.mtime;
+          open.dirty = false;
+        }
+        uiState.indexRevision += 1;
+      });
     } catch (error) {
       showToast(errorMessage(error));
     } finally {

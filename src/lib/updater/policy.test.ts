@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { automaticCheckIsDue, updaterStartupAction } from "./policy";
+import {
+  automaticCheckIsDue,
+  automaticCheckPolicy,
+  updaterStartupAction,
+} from "./policy";
 
 const now = "2026-08-02T12:00:00.000Z";
 
@@ -25,12 +29,18 @@ describe("updater startup policy", () => {
     ).toBe(true);
   });
 
-  it("safely ignores invalid and future timestamps", () => {
+  it("checks after malformed timestamps and rebases future timestamps", () => {
     expect(
       automaticCheckIsDue("automatic", "2026-02-31T12:00:00.000Z", now),
     ).toBe(true);
     expect(
       automaticCheckIsDue("automatic", "2026-08-03T12:00:00.000Z", now),
-    ).toBe(true);
+    ).toBe(false);
+    expect(
+      automaticCheckPolicy("automatic", "2026-08-03T12:00:00.000Z", now),
+    ).toBe("resetFuture");
+    expect(
+      updaterStartupAction("automatic", "2026-08-03T12:00:00.000Z", now),
+    ).toBe("backgroundCheck");
   });
 });

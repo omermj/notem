@@ -32,7 +32,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          if [[ ! "$RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([+-][0-9A-Za-z.-]+)?$ ]]; then
+          if [[ ! "$RELEASE_TAG" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
             echo "Release tag must be an exact semantic version such as v0.2.1." >&2
             exit 1
           fi
@@ -307,6 +307,16 @@ jobs:
       - name: Generate SHA-256 checksums
         run: node scripts/generate-sha256sums.mjs release-assets
 
+      - name: Reject stale draft assets before mutation
+        run: |
+          set -euo pipefail
+          if [[ -s release-metadata.json ]]; then
+            node scripts/verify-release-assets.mjs \
+              --expected release-assets \
+              --release-json release-metadata.json \
+              --allow-missing
+          fi
+
       - name: Create or update draft release and upload assets
         env:
           GH_TOKEN: ${{ github.token }}
@@ -358,3 +368,8 @@ jobs:
           gh release upload "$RELEASE_TAG" "${artifacts[@]}" \
             --repo "$REPOSITORY" \
             --clobber
+
+          gh api "repos/$REPOSITORY/releases/tags/$RELEASE_TAG" >uploaded-release.json
+          node scripts/verify-release-assets.mjs \
+            --expected release-assets \
+            --release-json uploaded-release.json

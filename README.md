@@ -134,8 +134,9 @@ Automatic checks wait for the primary interface and run at most once per rolling
 24 hours. An available release appears in an in-app banner; downloading or
 installing starts only after an explicit user action, and NoteM saves pending
 note edits before automatic installation. The native updater verifies the
-artifact signature before installation. AppImage installations on Linux use
-the normal updater flow; Debian and other non-AppImage Linux installations
+artifact signature before installation. Only stable `vX.Y.Z` releases are
+accepted; prerelease manifests fail closed. AppImage installations on Linux
+use the normal updater flow; Debian and other non-AppImage Linux installations
 open the fixed GitHub release page for a manual download.
 
 ## File safety

@@ -41,7 +41,7 @@ async function prepareDirectory(directory) {
 async function assertNonEmptyRegularFile(file, name) {
   let stats;
   try {
-    stats = await fs.stat(file);
+    stats = await fs.lstat(file);
   } catch (error) {
     if (error?.code === "ENOENT") {
       throw stagingError(`missing expected artifact: ${name}`);

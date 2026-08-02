@@ -63,7 +63,7 @@ function makeStore(
     preference?: "automatic" | "manual" | "unset";
     lastAttemptAt?: string | null;
     dismissedVersion?: string | null;
-    prepareForInstallation?: () => Promise<void>;
+    prepareForInstallation?: () => Promise<() => void>;
   } = {},
 ) {
   return createUpdaterStore({
@@ -73,7 +73,8 @@ function makeStore(
     getUpdateCheckPreference: () => options.preference ?? "automatic",
     getLastAutomaticUpdateAttemptAt: () => options.lastAttemptAt ?? null,
     getDismissedUpdateVersion: () => options.dismissedVersion ?? null,
-    prepareForInstallation: options.prepareForInstallation,
+    prepareForInstallation:
+      options.prepareForInstallation ?? (async () => () => undefined),
   });
 }
 
@@ -139,6 +140,20 @@ describe("updater store", () => {
     expect(store.state.errorSource).toBe("background");
   });
 
+  it("allows a manual retry after a background failure", async () => {
+    const client = fakeClient(
+      vi
+        .fn()
+        .mockRejectedValueOnce(new Error("offline"))
+        .mockResolvedValue(null),
+    );
+    const store = makeStore(client);
+
+    expect((await store.checkForUpdateInBackground()).status).toBe("error");
+    expect((await store.checkForUpdateManually()).status).toBe("upToDate");
+    expect(client.checkForUpdate).toHaveBeenCalledTimes(2);
+  });
+
   it("does not run a background check for manual-only or unset preferences", async () => {
     const client = fakeClient(async () => fakeUpdate());
     const manualStore = makeStore(client, { preference: "manual" });
@@ -184,18 +199,31 @@ describe("updater store", () => {
     expect(client.checkForUpdate).toHaveBeenCalledOnce();
   });
 
-  it.each(["not-a-timestamp", "2026-08-03T12:00:00.000Z"])(
-    "ignores invalid or future automatic timestamps: %s",
-    async (lastAttemptAt) => {
-      const client = fakeClient(async () => null);
-      const store = makeStore(client, { lastAttemptAt });
+  it("checks after a malformed automatic timestamp", async () => {
+    const client = fakeClient(async () => null);
+    const store = makeStore(client, { lastAttemptAt: "not-a-timestamp" });
 
-      const result = await store.checkForUpdateInBackground();
+    expect((await store.checkForUpdateInBackground()).status).toBe("upToDate");
+    expect(client.checkForUpdate).toHaveBeenCalledOnce();
+  });
 
-      expect(result.status).toBe("upToDate");
-      expect(client.checkForUpdate).toHaveBeenCalledOnce();
-    },
-  );
+  it("rebases a future timestamp without making a network request", async () => {
+    const client = fakeClient(async () => null);
+    const persistSettings = vi.fn(async () => undefined);
+    const store = createUpdaterStore({
+      client,
+      now: () => "2026-08-02T12:00:00.000Z",
+      getUpdateCheckPreference: () => "automatic",
+      getLastAutomaticUpdateAttemptAt: () => "2026-08-03T12:00:00.000Z",
+      persistSettings,
+    });
+
+    expect((await store.checkForUpdateInBackground()).status).toBe("skipped");
+    expect(client.checkForUpdate).not.toHaveBeenCalled();
+    expect(persistSettings).toHaveBeenCalledWith({
+      lastAutomaticUpdateAttemptAt: "2026-08-02T12:00:00.000Z",
+    });
+  });
 
   it("records a background attempt before starting the network request", async () => {
     const events: string[] = [];
@@ -251,6 +279,49 @@ describe("updater store", () => {
     expect(store.state.status).toBe("available");
     expect(store.state.availableVersion).toBe("1.2.3");
     expect(store.state.releaseNotes).toBe("<not-rendered> release notes");
+  });
+
+  it.each(["v1.2.3-beta.1", "1.2.3+build.7", "../../unexpected"])(
+    "rejects prerelease or malformed update version %s",
+    async (version) => {
+      const update = fakeUpdate(version);
+      const client = fakeClient(async () => update);
+      const store = makeStore(client);
+
+      expect((await store.checkForUpdateManually()).status).toBe("error");
+      expect(update.close).toHaveBeenCalledOnce();
+    },
+  );
+
+  it("closes a stale update handle before replacing it", async () => {
+    const stale = fakeUpdate("1.2.3");
+    const current = fakeUpdate("1.2.4");
+    const client = fakeClient(
+      vi.fn().mockResolvedValueOnce(stale).mockResolvedValueOnce(current),
+    );
+    const store = makeStore(client);
+
+    await store.checkForUpdateManually();
+    await store.checkForUpdateManually();
+
+    expect(stale.close).toHaveBeenCalledOnce();
+    expect(current.close).not.toHaveBeenCalled();
+    expect(store.state.availableVersion).toBe("1.2.4");
+  });
+
+  it("ignores dismiss requests while a check is in progress", async () => {
+    const gate = deferred<UpdaterUpdate | null>();
+    const client = fakeClient(async () => gate.promise);
+    const store = makeStore(client);
+
+    const checking = store.checkForUpdateManually();
+    await Promise.resolve();
+    await store.dismissAvailableUpdate();
+    expect(store.state.status).toBe("checking");
+
+    gate.resolve(fakeUpdate());
+    await checking;
+    expect(store.state.status).toBe("available");
   });
 
   it("reports the no-update state", async () => {
@@ -335,6 +406,43 @@ describe("updater store", () => {
     );
   });
 
+  it("releases the edit lock after a partial download failure", async () => {
+    const releaseLock = vi.fn();
+    const update = fakeUpdate("1.2.3", async (onEvent) => {
+      onEvent({ type: "progress", chunkBytes: 20 });
+      throw new Error("network interrupted");
+    });
+    const client = fakeClient(async () => update);
+    const store = makeStore(client, {
+      prepareForInstallation: async () => releaseLock,
+    });
+
+    await store.checkForUpdateManually();
+    await store.installAvailableUpdate();
+
+    expect(store.state.status).toBe("error");
+    expect(releaseLock).toHaveBeenCalledOnce();
+    expect(update.close).toHaveBeenCalledOnce();
+  });
+
+  it("reports an installed update separately when automatic restart fails", async () => {
+    const releaseLock = vi.fn();
+    const client = fakeClient(async () => fakeUpdate());
+    client.relaunch = vi.fn(async () => {
+      throw new Error("restart unavailable");
+    });
+    const store = makeStore(client, {
+      prepareForInstallation: async () => releaseLock,
+    });
+
+    await store.checkForUpdateManually();
+    await store.installAvailableUpdate();
+
+    expect(store.state.status).toBe("restartRequired");
+    expect(store.state.error).toContain("update was installed");
+    expect(releaseLock).toHaveBeenCalledOnce();
+  });
+
   it("prevents repeated install clicks from starting concurrent downloads", async () => {
     const gate = deferred<void>();
     const downloadAndInstall = vi.fn(async () => gate.promise);
@@ -351,6 +459,24 @@ describe("updater store", () => {
     expect(downloadAndInstall).toHaveBeenCalledOnce();
     gate.resolve();
     await Promise.all([first, second]);
+  });
+
+  it("refuses a check while installation is in progress", async () => {
+    const gate = deferred<void>();
+    const client = fakeClient(async () =>
+      fakeUpdate("1.2.3", async () => gate.promise),
+    );
+    const store = makeStore(client);
+
+    await store.checkForUpdateManually();
+    const installation = store.installAvailableUpdate();
+    await Promise.resolve();
+    const result = await store.checkForUpdateManually();
+
+    expect(result).toMatchObject({ started: false, status: "error" });
+    expect(client.checkForUpdate).toHaveBeenCalledOnce();
+    gate.resolve();
+    await installation;
   });
 
   it("opens the release page instead of installing on manual-only platforms", async () => {

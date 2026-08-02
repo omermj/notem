@@ -9,7 +9,7 @@ import {
   releaseArtifactDefinitions,
 } from "./generate-updater-manifest.mjs";
 
-const VERSION = "1.2.3+build";
+const VERSION = "1.2.3";
 const TAG = `v${VERSION}`;
 const PUBLICATION_DATE = "2026-08-02T12:00:00Z";
 
@@ -93,7 +93,7 @@ test("generates a valid deterministic three-platform manifest", async () => {
       ]);
       assert.equal(
         first.platforms["linux-x86_64"].url,
-        "https://github.com/omermj/notem/releases/download/v1.2.3%2Bbuild/NoteM_1.2.3%2Bbuild_amd64.AppImage",
+        "https://github.com/omermj/notem/releases/download/v1.2.3/NoteM_1.2.3_amd64.AppImage",
       );
       assert.equal(
         first.platforms["darwin-aarch64"].signature,
@@ -123,7 +123,7 @@ test("rejects a missing signature", async () => {
             path.join(artifactsDirectory, "latest.json"),
           ),
         ),
-        /missing updater artifact: NoteM_1\.2\.3\+build_amd64\.AppImage\.sig/,
+        /missing updater artifact: NoteM_1\.2\.3_amd64\.AppImage\.sig/,
       );
     },
   );
@@ -138,7 +138,7 @@ test("rejects duplicate artifacts", async () => {
           path.join(artifactsDirectory, "latest.json"),
         ),
       ),
-      /duplicate updater artifact: NoteM_1\.2\.3\+build_amd64\.AppImage/,
+      /duplicate updater artifact: NoteM_1\.2\.3_amd64\.AppImage/,
     );
   });
 });
@@ -156,7 +156,7 @@ test("rejects an empty signature", async () => {
           path.join(artifactsDirectory, "latest.json"),
         ),
       ),
-      /zero-byte updater artifact: NoteM_1\.2\.3\+build_amd64\.AppImage\.sig/,
+      /zero-byte updater artifact: NoteM_1\.2\.3_amd64\.AppImage\.sig/,
     );
   });
 });
@@ -176,7 +176,7 @@ test("rejects a wrong platform artifact", async () => {
             path.join(artifactsDirectory, "latest.json"),
           ),
         ),
-        /unexpected updater artifact: NoteM_1\.2\.3\+build_x86_64\.AppImage/,
+        /unexpected updater artifact: NoteM_1\.2\.3_x86_64\.AppImage/,
       );
     },
   );
@@ -197,10 +197,34 @@ test("rejects malformed versions and tag/version mismatches", async () => {
     await assert.rejects(
       generateUpdaterManifest(
         manifestOptions(artifactsDirectory, outputPath, {
+          tag: "v1.2.3-beta.1",
+          version: "1.2.3-beta.1",
+        }),
+      ),
+      /version must be a valid semantic version/,
+    );
+    await assert.rejects(
+      generateUpdaterManifest(
+        manifestOptions(artifactsDirectory, outputPath, {
           tag: "v1.2.4",
         }),
       ),
       /tag v1\.2\.4 does not match/,
+    );
+  });
+});
+
+test("rejects normalized but invalid RFC 3339 times", async () => {
+  await withFixture({}, async (artifactsDirectory) => {
+    await assert.rejects(
+      generateUpdaterManifest(
+        manifestOptions(
+          artifactsDirectory,
+          path.join(artifactsDirectory, "latest.json"),
+          { publicationDate: "2026-08-02T24:00:00Z" },
+        ),
+      ),
+      /publication date must be a valid RFC 3339 timestamp/,
     );
   });
 });
@@ -216,7 +240,7 @@ test("rejects unsupported extra updater artifacts", async () => {
             path.join(artifactsDirectory, "latest.json"),
           ),
         ),
-        /unexpected updater artifact: NoteM_1\.2\.3\+build_arm64\.AppImage/,
+        /unexpected updater artifact: NoteM_1\.2\.3_arm64\.AppImage/,
       );
     },
   );

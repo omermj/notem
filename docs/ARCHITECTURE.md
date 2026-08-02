@@ -77,7 +77,8 @@ Linux AppImage installations use normal Tauri installation. Debian and other
 non-AppImage Linux installations check and notify normally but open the fixed
 GitHub release page for a manual download. Before automatic installation, the
 frontend flushes all dirty notes through the existing vault save mechanism and
-blocks installation if that save cannot be confirmed.
+blocks installation if that save cannot be confirmed. Only stable `vX.Y.Z`
+releases are accepted; prerelease and build-metadata versions fail closed.
 
 ## Security boundaries
 

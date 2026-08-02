@@ -49,7 +49,7 @@ async function ensureOutputDirectory(outputDirectory) {
 async function assertArtifactFile(file, name) {
   let stats;
   try {
-    stats = await fs.stat(file);
+    stats = await fs.lstat(file);
   } catch (error) {
     if (error?.code === "ENOENT") {
       throw artifactError(`missing expected artifact: ${name}`);

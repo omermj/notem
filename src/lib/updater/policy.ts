@@ -2,6 +2,8 @@ import type { UpdateCheckPreference } from "../api";
 
 export const AUTOMATIC_CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000;
 
+export type AutomaticCheckPolicy = "due" | "throttled" | "resetFuture";
+
 function timestampMilliseconds(value: string | null): number | null {
   if (!value) return null;
   const match =
@@ -52,15 +54,26 @@ export function automaticCheckIsDue(
   lastAttemptAt: string | null,
   now: string,
 ): boolean {
-  if (preference !== "automatic") return false;
+  return automaticCheckPolicy(preference, lastAttemptAt, now) === "due";
+}
+
+export function automaticCheckPolicy(
+  preference: UpdateCheckPreference,
+  lastAttemptAt: string | null,
+  now: string,
+): AutomaticCheckPolicy {
+  if (preference !== "automatic") return "throttled";
 
   const nowMs = timestampMilliseconds(now);
-  if (nowMs === null) return false;
+  if (nowMs === null) return "throttled";
 
   const lastAttemptMs = timestampMilliseconds(lastAttemptAt);
-  if (lastAttemptMs === null || lastAttemptMs > nowMs) return true;
+  if (lastAttemptMs === null) return "due";
+  if (lastAttemptMs > nowMs) return "resetFuture";
 
-  return nowMs - lastAttemptMs >= AUTOMATIC_CHECK_INTERVAL_MS;
+  return nowMs - lastAttemptMs >= AUTOMATIC_CHECK_INTERVAL_MS
+    ? "due"
+    : "throttled";
 }
 
 export type UpdaterStartupAction = "consent" | "backgroundCheck" | "none";
@@ -71,7 +84,8 @@ export function updaterStartupAction(
   now: string,
 ): UpdaterStartupAction {
   if (preference === "unset") return "consent";
-  return automaticCheckIsDue(preference, lastAttemptAt, now)
+  return preference === "automatic" &&
+    automaticCheckPolicy(preference, lastAttemptAt, now) !== "throttled"
     ? "backgroundCheck"
     : "none";
 }
