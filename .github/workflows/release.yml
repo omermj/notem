@@ -330,6 +330,28 @@ jobs:
         run: |
           set -euo pipefail
 
+          fetch_release_json() {
+            local destination="$1"
+            local error_path="${destination}.error"
+            local attempt
+            for attempt in {1..10}; do
+              if gh api "repos/$REPOSITORY/releases/tags/$RELEASE_TAG" >"$destination" 2>"$error_path"; then
+                rm -f "$error_path"
+                return 0
+              fi
+              if ! grep -Eq '404|Not Found' "$error_path"; then
+                cat "$error_path" >&2
+                return 1
+              fi
+              if (( attempt < 10 )); then
+                sleep 2
+              fi
+            done
+            cat "$error_path" >&2
+            echo "Release metadata was not available after retries." >&2
+            return 1
+          }
+
           current_sha="$(gh api "repos/$REPOSITORY/git/ref/tags/$RELEASE_TAG" --jq '.object.sha')"
           if [[ "$current_sha" != "$EXPECTED_TAG_OBJECT_SHA" ]]; then
             echo "Release tag moved before upload; refusing to publish." >&2
@@ -373,7 +395,7 @@ jobs:
             --repo "$REPOSITORY" \
             --clobber
 
-          gh api "repos/$REPOSITORY/releases/tags/$RELEASE_TAG" >uploaded-release.json
+          fetch_release_json uploaded-release.json
           node scripts/verify-release-assets.mjs \
             --expected release-assets \
             --release-json uploaded-release.json
