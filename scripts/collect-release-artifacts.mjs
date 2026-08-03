@@ -76,13 +76,16 @@ async function rejectAmbiguousFiles(sourceRoot, definitions) {
   for (const [directory, expectedNames] of expectedByDirectory) {
     const entries = await fs.readdir(directory, { withFileTypes: true });
     for (const entry of entries) {
-      if (!entry.name.startsWith("NoteM_")) {
+      if (entry.isDirectory()) {
         continue;
       }
       if (!entry.isFile()) {
         throw artifactError(
           `ambiguous artifact entry: ${path.join(directory, entry.name)}`,
         );
+      }
+      if (!entry.name.startsWith("NoteM_")) {
+        continue;
       }
       if (
         /\.(?:AppImage|AppImage\.sig|deb|dmg|app\.tar\.gz|app\.tar\.gz\.sig|exe|exe\.sig)$/.test(

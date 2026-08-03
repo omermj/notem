@@ -20,7 +20,7 @@
     "check": "svelte-check --tsconfig ./tsconfig.app.json",
     "lint": "eslint .",
     "test": "vitest run",
-    "test:release": "node --test scripts/generate-updater-manifest.node.mjs scripts/verify-release-assets.node.mjs scripts/verify-updater-security.node.mjs scripts/verify-workflow-policy.node.mjs",
+    "test:release": "node --test scripts/collect-release-artifacts.node.mjs scripts/generate-updater-manifest.node.mjs scripts/verify-release-assets.node.mjs scripts/verify-updater-security.node.mjs scripts/verify-workflow-policy.node.mjs",
     "audit:theme": "node scripts/audit-theme.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
