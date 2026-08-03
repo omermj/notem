@@ -1,6 +1,6 @@
 [package]
 name = "notem"
-version = "0.2.2"
+version = "0.2.4"
 description = "A lightweight, local-first Markdown knowledge base"
 authors = ["NoteM contributors"]
 edition = "2021"
