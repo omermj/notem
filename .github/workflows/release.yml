@@ -266,14 +266,18 @@ jobs:
         run: |
           set -euo pipefail
           release_json_path="release-metadata.json"
+          release_fetch_path="release-metadata.fetch"
           release_error_path="release-metadata.error"
-          if gh api "repos/$REPOSITORY/releases/tags/$RELEASE_TAG" >"$release_json_path" 2>"$release_error_path"; then
+          rm -f "$release_json_path" "$release_fetch_path"
+          if gh api "repos/$REPOSITORY/releases/tags/$RELEASE_TAG" >"$release_fetch_path" 2>"$release_error_path"; then
+            mv "$release_fetch_path" "$release_json_path"
             if [[ "$(jq -r '.draft' "$release_json_path")" != "true" ]]; then
               echo "A non-draft release already exists for $RELEASE_TAG; refusing to modify it." >&2
               exit 1
             fi
             notes="$(jq -r '.body // empty' "$release_json_path")"
           else
+            rm -f "$release_fetch_path" "$release_json_path"
             if ! grep -Eq '404|Not Found' "$release_error_path"; then
               cat "$release_error_path" >&2
               exit 1
