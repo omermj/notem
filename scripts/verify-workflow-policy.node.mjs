@@ -75,10 +75,19 @@ test("draft releases are recreated instead of edited in place", async () => {
     "utf8",
   );
   assert.match(workflow, /resolve_draft_ids\(\) \{/);
-  assert.match(workflow, /gh api -X DELETE "repos\/\$REPOSITORY\/releases\/\$stale_id"/);
+  assert.match(
+    workflow,
+    /gh api -X DELETE "repos\/\$REPOSITORY\/releases\/\$stale_id"/,
+  );
   assert.match(workflow, /draft_slug="\$\{create_output##\*\/\}"/);
-  assert.match(workflow, /gh api "repos\/\$REPOSITORY\/releases\/tags\/\$draft_slug"/);
-  assert.doesNotMatch(workflow, /--method PATCH "repos\/\$REPOSITORY\/releases\/\$draft_id"/);
+  assert.match(
+    workflow,
+    /gh api "repos\/\$REPOSITORY\/releases\/tags\/\$draft_slug"/,
+  );
+  assert.doesNotMatch(
+    workflow,
+    /--method PATCH "repos\/\$REPOSITORY\/releases\/\$draft_id"/,
+  );
 });
 
 async function policyFixture() {
