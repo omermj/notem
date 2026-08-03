@@ -50,10 +50,44 @@ test("release metadata is committed only after a successful GitHub response", as
   assert.match(workflow, /release_fetch_path="release-metadata\.fetch"/);
   assert.match(
     workflow,
-    /gh api "repos\/\$REPOSITORY\/releases\/tags\/\$RELEASE_TAG" >"\$release_fetch_path"/,
+    /gh api "repos\/\$REPOSITORY\/releases\/\$draft_id" >"\$release_fetch_path"/,
   );
   assert.match(workflow, /mv "\$release_fetch_path" "\$release_json_path"/);
-  assert.match(workflow, /rm -f "\$release_fetch_path" "\$release_json_path"/);
+  assert.match(
+    workflow,
+    /rm -f "\$release_json_path" "\$release_fetch_path" "\$release_error_path"/,
+  );
+});
+
+test("draft release metadata is resolved by release id, never by tag", async () => {
+  const workflow = await readFile(
+    path.join(repositoryRoot, ".github", "workflows", "release.yml"),
+    "utf8",
+  );
+  assert.match(workflow, /releases\?per_page=100/);
+  assert.match(workflow, /select\(\.draft == true and \(\.tag_name ==/);
+  assert.doesNotMatch(workflow, /releases\/tags\/\$RELEASE_TAG/);
+});
+
+test("draft releases are recreated instead of edited in place", async () => {
+  const workflow = await readFile(
+    path.join(repositoryRoot, ".github", "workflows", "release.yml"),
+    "utf8",
+  );
+  assert.match(workflow, /resolve_draft_ids\(\) \{/);
+  assert.match(
+    workflow,
+    /gh api -X DELETE "repos\/\$REPOSITORY\/releases\/\$stale_id"/,
+  );
+  assert.match(workflow, /draft_slug="\$\{create_output##\*\/\}"/);
+  assert.match(
+    workflow,
+    /gh api "repos\/\$REPOSITORY\/releases\/tags\/\$draft_slug"/,
+  );
+  assert.doesNotMatch(
+    workflow,
+    /--method PATCH "repos\/\$REPOSITORY\/releases\/\$draft_id"/,
+  );
 });
 
 async function policyFixture() {
