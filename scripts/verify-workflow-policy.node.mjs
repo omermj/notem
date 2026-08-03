@@ -89,6 +89,21 @@ test("rejects signing secrets in ordinary native validation", async () => {
   );
 });
 
+test("release asset verification retries GitHub release metadata propagation", async () => {
+  const workflow = await readFile(
+    path.join(repositoryRoot, ".github", "workflows", "release.yml"),
+    "utf8",
+  );
+  assert.match(workflow, /fetch_release_json\(\) \{/);
+  assert.match(workflow, /for attempt in \{1\.\.10\}; do/);
+  assert.match(workflow, /sleep 2/);
+  assert.match(workflow, /fetch_release_json uploaded-release\.json/);
+  assert.doesNotMatch(
+    workflow,
+    /gh api "repos\/\$REPOSITORY\/releases\/tags\/\$RELEASE_TAG" >uploaded-release\.json/,
+  );
+});
+
 test("rejects updater artifact creation in the base config", async () => {
   const fixture = await policyFixture();
   const config = JSON.parse(fixture.baseConfigContents);
