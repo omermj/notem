@@ -33,6 +33,15 @@ test("macOS release build requests the app bundle needed for updater artifacts",
   );
 });
 
+test("release workflow passes the manifest script's artifacts directory option", async () => {
+  const workflow = await readFile(
+    path.join(repositoryRoot, ".github", "workflows", "release.yml"),
+    "utf8",
+  );
+  assert.match(workflow, /--artifacts-directory updater-artifacts/);
+  assert.doesNotMatch(workflow, /--artifacts-dir updater-artifacts/);
+});
+
 async function policyFixture() {
   const read = (file) => readFile(path.join(repositoryRoot, file), "utf8");
   const [

@@ -297,7 +297,7 @@ jobs:
           RELEASE_PUBLICATION_DATE: ${{ steps.metadata.outputs.publication_date }}
         run: >-
           node scripts/generate-updater-manifest.mjs
-          --artifacts-dir updater-artifacts
+          --artifacts-directory updater-artifacts
           --output release-assets/latest.json
           --tag "$RELEASE_TAG"
           --version "${RELEASE_VERSION#v}"
