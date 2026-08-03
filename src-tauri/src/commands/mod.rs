@@ -7,5 +7,6 @@ pub mod search;
 pub mod settings;
 pub mod startup;
 pub mod tags;
+pub mod updater;
 pub mod vault;
 pub mod window;

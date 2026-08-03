@@ -16,7 +16,7 @@ NoteM is pre-1.0 software under active development. The private `v0.2.0` build w
 
 ## Install
 
-Once `v0.2.1` is published, download the package for your platform from [GitHub Releases](https://github.com/omermj/notem/releases). NoteM does not update itself, so new versions must be downloaded manually.
+Once `v0.2.1` is published, download the package for your platform from [GitHub Releases](https://github.com/omermj/notem/releases). On the first updater-enabled launch, NoteM asks whether to enable optional automatic GitHub checks or use manual checks only. No check happens before that choice.
 
 ### Linux x86-64
 
@@ -52,7 +52,7 @@ Run the NSIS setup executable. Windows code signing is not configured, so SmartS
 | macOS 11+                                                     | Apple Silicon (`arm64`) | DMG              | Supported release target                     |
 | Windows 10/11                                                 | x86-64                  | NSIS `.exe`      | Supported release target                     |
 
-Intel macOS, Linux ARM, Windows ARM, mobile platforms, and 32-bit operating systems are not currently supported. Native Linux x86-64, macOS ARM, and Windows x86-64 tests, strict Clippy, and installer builds pass in the release-validation workflow; the unsigned installers still require maintainer runtime smoke tests before `v0.2.1` is published.
+Intel macOS, Linux ARM, Windows ARM, mobile platforms, and 32-bit operating systems are not currently supported. Native Linux x86-64, macOS ARM, and Windows x86-64 tests, strict Clippy, and installer builds pass in the release-validation workflow; the installers still require maintainer runtime smoke tests before `v0.2.1` is published.
 
 ## Verify downloads and signing
 
@@ -75,7 +75,7 @@ Get-Content .\SHA256SUMS
 
 Compare the Windows/macOS hash exactly with the matching line in `SHA256SUMS`. Checksums detect download corruption or replacement relative to the release page; they are not a substitute for a cryptographic publisher signature.
 
-The initial public release artifacts will not be signed by a trusted release identity: macOS uses ad-hoc signing without notarization, Windows packages are unsigned, and Linux packages have no project release signature. These limitations must also appear in each public release’s notes.
+Release updater payloads include Tauri `.sig` files verified by the public key bundled in NoteM. This artifact signature verification does not amount to Apple notarization, Windows publisher signing, or DEB repository signing: macOS uses ad-hoc signing without notarization, Windows packages are not publisher-signed, and operating-system warnings may remain.
 
 ## Features
 
@@ -91,6 +91,7 @@ The initial public release artifacts will not be signed by a trusted release ide
 - Restored window size, position, and maximized state
 - Single-instance behavior and operating-system “Open with NoteM” registration for `.md`
 - Local SQLite FTS5 index that can always be rebuilt from the vault
+- Optional manual or automatic GitHub update checks with signature-verified installation where the platform supports it
 
 ## Vault format
 
@@ -126,6 +127,18 @@ PDF attachments open in NoteM when selected in the file explorer or through a no
 
 PDFs remain read-only and are never added to the SQLite note index. The viewer and its fonts, character maps, and worker are bundled with NoteM and do not require a network connection.
 
+## Updates
+
+After the first-run choice, NoteM can check GitHub manually or automatically.
+Automatic checks wait for the primary interface and run at most once per rolling
+24 hours. An available release appears in an in-app banner; downloading or
+installing starts only after an explicit user action, and NoteM saves pending
+note edits before automatic installation. The native updater verifies the
+artifact signature before installation. Only stable `vX.Y.Z` releases are
+accepted; prerelease manifests fail closed. AppImage installations on Linux
+use the normal updater flow; Debian and other non-AppImage Linux installations
+open the fixed GitHub release page for a manual download.
+
 ## File safety
 
 The detailed trust boundaries and residual risks are documented in the
@@ -139,14 +152,14 @@ The detailed trust boundaries and residual risks are documented in the
 
 ## Privacy
 
-NoteM has no account, telemetry, analytics, advertising, cloud synchronization, or automatic update check. Notes and attachments stay in the selected vault; derived search metadata stays in `<vault>/.notem/`. Application preferences are stored in the operating system’s application-config directory.
+NoteM has no account, telemetry, analytics, advertising, or cloud synchronization. Notes and attachments stay in the selected vault; derived search metadata stays in `<vault>/.notem/`. Application preferences are stored in the operating system’s application-config directory. Update checks are optional and use the native updater to contact only the fixed GitHub release metadata endpoint. Manual checks are user-triggered; automatic checks are user-enabled, wait for the primary UI, and are throttled to once per rolling 24 hours. The installed version and platform are used locally to compare releases and select an artifact. The request does not include notes, vault paths, settings, usage data, identifiers, or telemetry, although GitHub receives normal request network information and standard updater request headers. See the full [privacy statement](PRIVACY.md) and [threat model](docs/THREAT_MODEL.md).
 
 HTTP, HTTPS, and email links leave NoteM only when you activate them and are handed to the operating system’s default application. PDF.js resources and spellcheck dictionaries are bundled and loaded locally. See the full [privacy statement](PRIVACY.md) and [threat model](docs/THREAT_MODEL.md).
 
 ## Known limitations
 
 - NoteM is pre-1.0; vault and settings migrations may still change between minor releases.
-- There is no synchronization, account system, end-to-end encryption, mobile app, plugin marketplace, collaborative editing, automatic updater, or PDF export.
+- There is no synchronization, account system, end-to-end encryption, mobile app, plugin marketplace, collaborative editing, or PDF export.
 - Release signing and notarization are not configured. Review the disclosure and checksum instructions above.
 - Only the platforms and architectures in the support table are release targets.
 - Files above 10 MB open read-only, and PDFs are view-only.
@@ -272,7 +285,7 @@ The installer is written under `src-tauri\target\release\bundle\nsis\`.
 
 The [CI workflow](.github/workflows/ci.yml) runs frontend checks, frontend tests, Rust tests, clippy, and the production frontend build on one Linux runner for pull requests and pushes to `main`. Native installers are not built during normal CI. The release-mode performance audit runs only when CI is dispatched manually.
 
-The [draft-release workflow](.github/workflows/release.yml) builds Linux, macOS ARM, and Windows installers only when explicitly dispatched with an existing annotated version tag. Read-only jobs build the tag's resolved commit, then a separate `release` environment job creates or updates the draft and uploads the installers plus `SHA256SUMS`. It never publishes the release automatically. To avoid hosted-runner usage entirely, build on native machines and upload the installers using the [manual release guide](docs/RELEASING.md).
+The [draft-release workflow](.github/workflows/release.yml) builds Linux, macOS ARM, and Windows installers plus signed updater payloads only when explicitly dispatched with an existing annotated version tag. Read-only jobs build the tag's resolved commit with the release-only updater overlay, then a separate `release` environment job validates exact assets, generates deterministic `latest.json` and `SHA256SUMS`, and creates or updates the draft. It never publishes the release automatically. See the [release guide](docs/RELEASING.md) for signing-key handling, draft behavior, and the manual bootstrap limitation.
 
 Signing credentials are intentionally not stored in the repository.
 

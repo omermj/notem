@@ -5,6 +5,7 @@
   import AppearanceSettings from "./AppearanceSettings.svelte";
   import SettingsIcon from "./SettingsIcon.svelte";
   import SettingToggle from "./SettingToggle.svelte";
+  import UpdaterAbout from "./UpdaterAbout.svelte";
   import { noteTitle, templatePaths } from "../productivity";
   import {
     settingsState,
@@ -28,7 +29,6 @@
   const templates = $derived(
     templatePaths(vaultState.tree, settingsState.templatesFolder),
   );
-
   function close(): void {
     uiState.settingsOpen = false;
   }
@@ -275,12 +275,13 @@
         {:else}
           <div class="about-panel">
             <span class="welcome-icon" aria-hidden="true">N</span>
-            <h3>NoteM 0.2.0</h3>
+            <h3>NoteM</h3>
             <p>A lightweight, local-first Markdown knowledge base.</p>
             <p>
               Your notes stay as plain files. No cloud, account, or telemetry.
             </p>
             <p>Open-source software licensed under the MIT License.</p>
+            <UpdaterAbout />
             <div class="legal-documents">
               <details>
                 <summary>MIT License</summary>

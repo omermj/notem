@@ -17,6 +17,7 @@ import {
   vault_open,
   type VaultEntry,
 } from "../api";
+import { SvelteMap, SvelteSet } from "svelte/reactivity";
 import {
   activeTab,
   openPath,
@@ -46,15 +47,17 @@ export interface EditConflict {
   diskMtime: number;
 }
 
-class VaultStore {
+export class VaultStore {
   path = $state<string | null>(null);
   name = $state<string | null>(null);
   tree = $state<VaultEntry[]>([]);
   files = $state<Record<string, OpenFile>>({});
   conflict = $state<EditConflict | null>(null);
-  private autosaveTimers = new Map<string, number>();
-  private activeSaves = new Map<string, Promise<void>>();
-  private activeLoads = new Map<string, Promise<OpenFile>>();
+  updateInstallationLocked = $state(false);
+  private autosaveTimers = new SvelteMap<string, number>();
+  private activeSaves = new SvelteMap<string, Promise<void>>();
+  private activeLoads = new SvelteMap<string, Promise<OpenFile>>();
+  private activeEditOperations = new SvelteSet<Promise<unknown>>();
 
   get currentFile(): OpenFile | null {
     const path = activeTab()?.path;
@@ -139,7 +142,13 @@ class VaultStore {
 
   updateContent(path: string, content: string): void {
     const file = this.files[path];
-    if (!file || file.readonly || file.kind !== "text") return;
+    if (
+      !file ||
+      file.readonly ||
+      file.kind !== "text" ||
+      this.updateInstallationLocked
+    )
+      return;
     file.content = content;
     file.dirty = true;
     this.scheduleAutosave(path);
@@ -187,11 +196,50 @@ class VaultStore {
   }
 
   async saveAll(): Promise<void> {
-    await Promise.all(
-      Object.values(this.files)
-        .filter((file) => file.dirty)
-        .map((file) => this.save(file.path)),
-    );
+    while (true) {
+      const pending = Object.values(this.files).filter(
+        (file) => file.dirty || file.saving || this.activeSaves.has(file.path),
+      );
+      if (pending.length === 0) return;
+      await Promise.all(pending.map((file) => this.save(file.path)));
+    }
+  }
+
+  async runEditOperation<T>(operation: () => Promise<T>): Promise<T> {
+    if (this.updateInstallationLocked) {
+      throw new Error("Editing is paused while an update is being installed");
+    }
+    const pending = operation();
+    this.activeEditOperations.add(pending);
+    try {
+      return await pending;
+    } finally {
+      this.activeEditOperations.delete(pending);
+    }
+  }
+
+  async prepareForUpdateInstallation(): Promise<() => void> {
+    if (this.updateInstallationLocked) {
+      throw new Error("An update installation is already in progress");
+    }
+    this.updateInstallationLocked = true;
+    try {
+      await Promise.all([...this.activeEditOperations]);
+      await this.saveAll();
+      if (
+        Object.values(this.files).some((file) => file.dirty || file.saving) ||
+        this.activeSaves.size > 0 ||
+        this.activeEditOperations.size > 0
+      ) {
+        throw new Error("Pending note changes could not be saved");
+      }
+      return () => {
+        this.updateInstallationLocked = false;
+      };
+    } catch (error) {
+      this.updateInstallationLocked = false;
+      throw error;
+    }
   }
 
   async createNote(parent = "", newTab = false): Promise<string> {

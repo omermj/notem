@@ -1216,7 +1216,10 @@ body.resizing-workspace {
 .properties-body {
   display: grid;
   gap: 3px;
+  margin: 0;
+  border: 0;
   padding: 2px 8px 10px;
+  min-width: 0;
 }
 
 .property-row {
@@ -2050,6 +2053,238 @@ body.resizing-workspace {
   height: 1px;
   margin: 5px 7px;
   background: color-mix(in srgb, var(--color-border-strong) 58%, transparent);
+}
+
+.update-consent,
+.update-banner {
+  position: fixed;
+  z-index: 65;
+  top: 16px;
+  right: 16px;
+  width: min(460px, calc(100vw - 32px));
+  padding: 17px;
+  border: 1px solid var(--color-border-strong);
+  border-left: 3px solid var(--color-accent);
+  border-radius: 11px;
+  color: var(--color-text);
+  background: color-mix(in srgb, var(--color-surface) 97%, transparent);
+  box-shadow: var(--shadow-modal);
+  backdrop-filter: blur(14px);
+}
+
+.update-consent h2,
+.update-banner h2 {
+  margin: 0 0 8px;
+  color: var(--color-text-strong);
+  font-size: 0.96rem;
+}
+
+.update-consent p,
+.update-banner p {
+  margin: 6px 0 0;
+  color: var(--color-text-muted);
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.update-consent-actions,
+.update-banner-actions,
+.update-about-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 7px;
+}
+
+.update-consent-actions {
+  margin-top: 15px;
+}
+
+.update-consent-actions button,
+.update-banner-actions button,
+.update-about-actions button {
+  min-height: 32px;
+  padding: 6px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 7px;
+  color: var(--color-text);
+  background: var(--color-sidebar);
+  cursor: pointer;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.update-consent-actions button:hover:not(:disabled),
+.update-banner-actions button:hover:not(:disabled),
+.update-about-actions button:hover:not(:disabled) {
+  border-color: var(--color-accent);
+  color: var(--color-text-strong);
+}
+
+.update-consent-actions button:focus-visible,
+.update-banner-actions button:focus-visible,
+.update-about-actions button:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.update-consent-actions button:disabled,
+.update-banner-actions button:disabled,
+.update-about-actions button:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
+.update-consent-actions .primary-button,
+.update-banner-actions .primary-button,
+.update-about-actions .primary-button {
+  border-color: var(--color-accent);
+  color: var(--color-accent-contrast);
+  background: var(--color-accent);
+}
+
+.update-banner {
+  top: 16px;
+  width: min(520px, calc(100vw - 32px));
+}
+
+.update-banner-content {
+  min-width: 0;
+}
+
+.update-banner-notes {
+  display: -webkit-box;
+  max-height: 3.1em;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.update-banner-hint {
+  color: var(--color-text-subtle) !important;
+  font-size: 0.7rem !important;
+}
+
+.update-banner-actions {
+  margin-top: 14px;
+}
+
+.update-about-group {
+  width: 100%;
+  margin-top: 24px;
+  margin-bottom: 0;
+  text-align: left;
+}
+
+.update-about-value {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-text-muted);
+  font-size: 0.78rem;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.update-about-group .setting-action {
+  justify-self: stretch;
+}
+
+.update-about-error,
+.update-about-success,
+.update-about-warning,
+.update-about-hint {
+  width: 100%;
+  margin: 10px 0 0;
+  padding: 9px 11px;
+  border: 1px solid var(--color-border);
+  border-radius: 7px;
+  color: var(--color-text-muted);
+  background: var(--color-sidebar);
+  font-size: 0.76rem;
+  line-height: 1.45;
+  text-align: left;
+}
+
+.update-about-error {
+  border-color: color-mix(
+    in srgb,
+    var(--color-danger) 55%,
+    var(--color-border)
+  );
+  color: var(--color-danger);
+}
+
+.update-about-success {
+  border-color: color-mix(
+    in srgb,
+    var(--color-accent) 48%,
+    var(--color-border)
+  );
+  color: var(--color-accent);
+}
+
+.updater-available-group {
+  width: 100%;
+  margin-top: 14px;
+  text-align: left;
+}
+
+.update-about-release {
+  margin: 0 16px;
+  padding: 11px 0;
+  border-top: 1px solid var(--color-border);
+}
+
+.update-about-release strong {
+  color: var(--color-text-strong);
+  font-size: 0.88rem;
+}
+
+.update-about-release p {
+  margin: 6px 0 0;
+  color: var(--color-text-muted);
+  font-size: 0.76rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.update-progress {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  margin: 0 16px 10px;
+  color: var(--color-text-muted);
+  font-size: 0.72rem;
+}
+
+.update-progress progress {
+  width: 100%;
+  height: 7px;
+  accent-color: var(--color-accent);
+}
+
+.update-about-warning,
+.update-about-hint {
+  margin: 0 16px 11px;
+  width: auto;
+  color: var(--color-text-muted);
+}
+
+.update-about-actions {
+  justify-content: flex-start;
+  margin: 0 16px 14px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .update-consent,
+  .update-banner,
+  .update-progress progress {
+    animation: none;
+    transition: none;
+  }
 }
 
 @keyframes context-menu-in {

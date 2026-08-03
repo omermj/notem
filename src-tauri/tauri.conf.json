@@ -49,8 +49,20 @@
       }
     ]
   },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEEwMDMxQ0UyMzQ4MjA5RTcKUldUbkNZSTA0aHdEb0xJT1lmVHUvdnZ6YjY3cmVqS0VDZVdwQ3p1UVBIMWJ0M0EyS08zcnc0K0cK",
+      "endpoints": [
+        "https://github.com/omermj/notem/releases/latest/download/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
+    }
+  },
   "bundle": {
     "active": true,
+    "createUpdaterArtifacts": false,
     "targets": "all",
     "icon": [
       "icons/32x32.png",

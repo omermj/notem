@@ -7,6 +7,7 @@ on:
       - package.json
       - pnpm-lock.yaml
       - scripts/verify-bundle-legal.mjs
+      - scripts/verify-workflow-policy.mjs
       - src-tauri/**
   push:
     branches: [main]
@@ -61,6 +62,9 @@ jobs:
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: 22.18.0
+
+      - name: Verify workflow policy
+        run: node scripts/verify-workflow-policy.mjs
 
       - name: Enable pinned pnpm
         run: |

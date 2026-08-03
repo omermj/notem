@@ -66,6 +66,7 @@ export interface MarkdownEditor {
   view: EditorView;
   setDocument(content: string): void;
   insert(text: string): void;
+  setReadOnly(readOnly: boolean): void;
   updateSettings(settings: {
     fontSize: number;
     font: EditorFont;
@@ -212,6 +213,7 @@ export function createMarkdownEditor(
   const appearance = new Compartment();
   const spellcheck = new Compartment();
   const activeLineHighlight = new Compartment();
+  const editable = new Compartment();
   const state = EditorState.create({
     doc: options.doc,
     selection: {
@@ -238,6 +240,7 @@ export function createMarkdownEditor(
       ),
       flashHighlight,
       EditorView.lineWrapping,
+      editable.of(EditorView.editable.of(true)),
       placeholder("Start writing…"),
       livePreview({
         sourcePath: options.sourcePath,
@@ -340,6 +343,11 @@ export function createMarkdownEditor(
         scrollIntoView: true,
       });
       view.focus();
+    },
+    setReadOnly(readOnly: boolean): void {
+      view.dispatch({
+        effects: editable.reconfigure(EditorView.editable.of(!readOnly)),
+      });
     },
     updateSettings(settings): void {
       view.dispatch({

@@ -61,18 +61,20 @@
     const bounds = targetElement.getBoundingClientRect();
     const after = point.clientY > bounds.top + bounds.height / 2;
     try {
-      await vaultState.save(path);
-      const file = vaultState.files[path];
-      if (!file) return;
-      const result = await outline_move(
-        path,
-        dragged.line,
-        target.line,
-        after,
-        file.mtime,
-      );
-      vaultState.replaceContent(path, result.content, result.mtime);
-      uiState.indexRevision += 1;
+      await vaultState.runEditOperation(async () => {
+        await vaultState.save(path);
+        const file = vaultState.files[path];
+        if (!file) return;
+        const result = await outline_move(
+          path,
+          dragged.line,
+          target.line,
+          after,
+          file.mtime,
+        );
+        vaultState.replaceContent(path, result.content, result.mtime);
+        uiState.indexRevision += 1;
+      });
     } catch (error) {
       showToast(errorMessage(error));
     }

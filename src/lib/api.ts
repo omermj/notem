@@ -68,6 +68,20 @@ export interface AppSettings {
   dailyNoteTemplate: string | null;
   templatesFolder: string;
   hotkeys: Record<string, string>;
+  updateCheckPreference: UpdateCheckPreference;
+  lastAutomaticUpdateAttemptAt: string | null;
+  lastSuccessfulUpdateCheckAt: string | null;
+  dismissedUpdateVersion: string | null;
+}
+
+export type UpdateCheckPreference = "unset" | "automatic" | "manual";
+
+export type UpdateInstallationMode = "automatic" | "manualDownloadOnly";
+
+export interface UpdateInstallationCapability {
+  mode: UpdateInstallationMode;
+  /** Windows installer flows shut the current process down themselves. */
+  relaunchAfterInstall?: boolean;
 }
 
 export type PropertyValueType =
@@ -329,6 +343,10 @@ export function settings_get(): Promise<AppSettings> {
 
 export function settings_set(settings: AppSettings): Promise<void> {
   return invokeCommand("settings_set", { settings });
+}
+
+export function update_installation_capability(): Promise<UpdateInstallationCapability> {
+  return invokeCommand("update_installation_capability");
 }
 
 export function vault_settings_get(): Promise<Record<string, unknown>> {
