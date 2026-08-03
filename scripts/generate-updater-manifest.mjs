@@ -93,19 +93,11 @@ export function releaseArtifactDefinitions(platform, version) {
       },
       {
         name: `${APP_NAME}_${version}_aarch64.app.tar.gz`,
-        source: [
-          "bundle",
-          "macos",
-          `${APP_NAME}_${version}_aarch64.app.tar.gz`,
-        ],
+        source: ["bundle", "macos", `${APP_NAME}.app.tar.gz`],
       },
       {
         name: `${APP_NAME}_${version}_aarch64.app.tar.gz.sig`,
-        source: [
-          "bundle",
-          "macos",
-          `${APP_NAME}_${version}_aarch64.app.tar.gz.sig`,
-        ],
+        source: ["bundle", "macos", `${APP_NAME}.app.tar.gz.sig`],
       },
     ],
     "windows-x86_64": [

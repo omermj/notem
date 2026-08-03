@@ -96,6 +96,10 @@ test("generates a valid deterministic three-platform manifest", async () => {
         "https://github.com/omermj/notem/releases/download/v1.2.3/NoteM_1.2.3_amd64.AppImage",
       );
       assert.equal(
+        first.platforms["darwin-aarch64"].url,
+        "https://github.com/omermj/notem/releases/download/v1.2.3/NoteM_1.2.3_aarch64.app.tar.gz",
+      );
+      assert.equal(
         first.platforms["darwin-aarch64"].signature,
         `signature for NoteM_${VERSION}_aarch64.app.tar.gz.sig\n`,
       );
