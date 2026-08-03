@@ -268,20 +268,24 @@ jobs:
           release_json_path="release-metadata.json"
           release_fetch_path="release-metadata.fetch"
           release_error_path="release-metadata.error"
-          rm -f "$release_json_path" "$release_fetch_path"
-          if gh api "repos/$REPOSITORY/releases/tags/$RELEASE_TAG" >"$release_fetch_path" 2>"$release_error_path"; then
-            mv "$release_fetch_path" "$release_json_path"
-            if [[ "$(jq -r '.draft' "$release_json_path")" != "true" ]]; then
-              echo "A non-draft release already exists for $RELEASE_TAG; refusing to modify it." >&2
+          rm -f "$release_json_path" "$release_fetch_path" "$release_error_path"
+          published_id="$(gh api --paginate "repos/$REPOSITORY/releases?per_page=100" \
+            --jq "[.[] | select(.draft == false and .tag_name == \"$RELEASE_TAG\")] | .[0].id // empty")"
+          if [[ -n "$published_id" ]]; then
+            echo "A non-draft release already exists for $RELEASE_TAG; refusing to modify it." >&2
+            exit 1
+          fi
+          draft_id="$(gh api --paginate "repos/$REPOSITORY/releases?per_page=100" \
+            --jq "[.[] | select(.draft == true and (.tag_name == \"$RELEASE_TAG\" or .name == \"NoteM $RELEASE_TAG\"))] | sort_by(.created_at) | .[0].id // empty")"
+          if [[ -n "$draft_id" ]]; then
+            if gh api "repos/$REPOSITORY/releases/$draft_id" >"$release_fetch_path" 2>"$release_error_path"; then
+              mv "$release_fetch_path" "$release_json_path"
+            else
+              cat "$release_error_path" >&2
               exit 1
             fi
             notes="$(jq -r '.body // empty' "$release_json_path")"
           else
-            rm -f "$release_fetch_path" "$release_json_path"
-            if ! grep -Eq '404|Not Found' "$release_error_path"; then
-              cat "$release_error_path" >&2
-              exit 1
-            fi
             notes="$(gh api --method POST "repos/$REPOSITORY/releases/generate-notes" -f "tag_name=$RELEASE_TAG" --jq '.body')"
           fi
           if [[ -z "$notes" ]]; then
@@ -330,26 +334,14 @@ jobs:
         run: |
           set -euo pipefail
 
-          fetch_release_json() {
-            local destination="$1"
-            local error_path="${destination}.error"
-            local attempt
-            for attempt in {1..10}; do
-              if gh api "repos/$REPOSITORY/releases/tags/$RELEASE_TAG" >"$destination" 2>"$error_path"; then
-                rm -f "$error_path"
-                return 0
-              fi
-              if ! grep -Eq '404|Not Found' "$error_path"; then
-                cat "$error_path" >&2
-                return 1
-              fi
-              if (( attempt < 10 )); then
-                sleep 2
-              fi
-            done
-            cat "$error_path" >&2
-            echo "Release metadata was not available after retries." >&2
-            return 1
+          resolve_published_id() {
+            gh api --paginate "repos/$REPOSITORY/releases?per_page=100" \
+              --jq "[.[] | select(.draft == false and .tag_name == \"$RELEASE_TAG\")] | .[0].id // empty"
+          }
+
+          resolve_draft_ids() {
+            gh api --paginate "repos/$REPOSITORY/releases?per_page=100" \
+              --jq "[.[] | select(.draft == true and (.tag_name == \"$RELEASE_TAG\" or .name == \"NoteM $RELEASE_TAG\"))] | sort_by(.created_at) | .[].id"
           }
 
           current_sha="$(gh api "repos/$REPOSITORY/git/ref/tags/$RELEASE_TAG" --jq '.object.sha')"
@@ -358,26 +350,34 @@ jobs:
             exit 1
           fi
 
-          if release_json="$(gh api "repos/$REPOSITORY/releases/tags/$RELEASE_TAG" 2>release-upload.error)"; then
-            if [[ "$(jq -r '.draft' <<<"$release_json")" != "true" ]]; then
-              echo "A non-draft release already exists for $RELEASE_TAG; refusing to modify it." >&2
-              exit 1
-            fi
-            gh release edit "$RELEASE_TAG" \
-              --repo "$REPOSITORY" \
-              --title "NoteM $RELEASE_TAG" \
-              --notes-file release-notes.txt
-          else
-            if ! grep -Eq '404|Not Found' release-upload.error; then
-              cat release-upload.error >&2
-              exit 1
-            fi
-            gh release create "$RELEASE_TAG" \
-              --repo "$REPOSITORY" \
-              --verify-tag \
-              --notes-file release-notes.txt \
-              --draft \
-              --title "NoteM $RELEASE_TAG"
+          if [[ -n "$(resolve_published_id)" ]]; then
+            echo "A non-draft release already exists for $RELEASE_TAG; refusing to modify it." >&2
+            exit 1
+          fi
+
+          stale_ids="$(resolve_draft_ids)"
+          if [[ -n "$stale_ids" ]]; then
+            while read -r stale_id; do
+              echo "Removing stale draft release $stale_id for $RELEASE_TAG." >&2
+              gh api -X DELETE "repos/$REPOSITORY/releases/$stale_id" >/dev/null
+            done <<<"$stale_ids"
+          fi
+
+          create_output="$(gh release create "$RELEASE_TAG" \
+            --repo "$REPOSITORY" \
+            --verify-tag \
+            --notes-file release-notes.txt \
+            --draft \
+            --title "NoteM $RELEASE_TAG")"
+          draft_slug="${create_output##*/}"
+          if [[ "$draft_slug" != untagged-* ]]; then
+            echo "Unexpected draft release URL: $create_output" >&2
+            exit 1
+          fi
+          draft_id="$(gh api "repos/$REPOSITORY/releases/tags/$draft_slug" --jq '.id')"
+          if [[ -z "$draft_id" ]]; then
+            echo "Draft release was created but could not be resolved." >&2
+            exit 1
           fi
 
           current_sha="$(gh api "repos/$REPOSITORY/git/ref/tags/$RELEASE_TAG" --jq '.object.sha')"
@@ -391,9 +391,39 @@ jobs:
             echo "No release artifacts were downloaded." >&2
             exit 1
           fi
-          gh release upload "$RELEASE_TAG" "${artifacts[@]}" \
-            --repo "$REPOSITORY" \
-            --clobber
+
+          release_json="$(gh api "repos/$REPOSITORY/releases/$draft_id")"
+          upload_url="$(jq -r '.upload_url // empty' <<<"$release_json")"
+          if [[ -z "$upload_url" ]]; then
+            echo "Draft release has no upload URL." >&2
+            exit 1
+          fi
+          upload_base="${upload_url%%\{*}"
+          for artifact in "${artifacts[@]}"; do
+            name="$(basename "$artifact")"
+            existing_asset_id="$(jq --arg name "$name" 'first(.assets[] | select(.name == $name) | .id) // empty' <<<"$release_json")"
+            if [[ -n "$existing_asset_id" ]]; then
+              gh api -X DELETE "repos/$REPOSITORY/releases/assets/$existing_asset_id" >/dev/null
+            fi
+            gh api --method POST "$upload_base?name=$name" \
+              -H "Content-Type: application/octet-stream" \
+              --input "$artifact" >/dev/null
+          done
+
+          fetch_release_json() {
+            local destination="$1"
+            local attempt
+            for attempt in {1..10}; do
+              if gh api "repos/$REPOSITORY/releases/$draft_id" >"$destination" 2>"${destination}.error"; then
+                rm -f "${destination}.error"
+                return 0
+              fi
+              sleep 2
+            done
+            cat "${destination}.error" >&2
+            echo "Release metadata was not available after retries." >&2
+            return 1
+          }
 
           fetch_release_json uploaded-release.json
           node scripts/verify-release-assets.mjs \
