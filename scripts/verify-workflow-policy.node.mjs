@@ -42,6 +42,20 @@ test("release workflow passes the manifest script's artifacts directory option",
   assert.doesNotMatch(workflow, /--artifacts-dir updater-artifacts/);
 });
 
+test("release metadata is committed only after a successful GitHub response", async () => {
+  const workflow = await readFile(
+    path.join(repositoryRoot, ".github", "workflows", "release.yml"),
+    "utf8",
+  );
+  assert.match(workflow, /release_fetch_path="release-metadata\.fetch"/);
+  assert.match(
+    workflow,
+    /gh api "repos\/\$REPOSITORY\/releases\/tags\/\$RELEASE_TAG" >"\$release_fetch_path"/,
+  );
+  assert.match(workflow, /mv "\$release_fetch_path" "\$release_json_path"/);
+  assert.match(workflow, /rm -f "\$release_fetch_path" "\$release_json_path"/);
+});
+
 async function policyFixture() {
   const read = (file) => readFile(path.join(repositoryRoot, file), "utf8");
   const [
