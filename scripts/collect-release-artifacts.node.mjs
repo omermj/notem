@@ -93,6 +93,150 @@ test("collects exact macOS and Windows artifacts", async () => {
   }
 });
 
+test("copies raw macOS updater artifacts to versioned names and preserves the DMG mapping", async () => {
+  await withFixture("darwin-aarch64", async ({ sourceRoot, definitions }) => {
+    const dmg = definitions.find(({ name }) => name.endsWith(".dmg"));
+    const tarball = definitions.find(({ name }) =>
+      name.endsWith(".app.tar.gz"),
+    );
+    const signature = definitions.find(({ name }) =>
+      name.endsWith(".app.tar.gz.sig"),
+    );
+    assert.deepEqual(dmg?.source, [
+      "bundle",
+      "dmg",
+      `NoteM_${VERSION}_aarch64.dmg`,
+    ]);
+    assert.deepEqual(tarball?.source, ["bundle", "macos", "NoteM.app.tar.gz"]);
+    assert.deepEqual(signature?.source, [
+      "bundle",
+      "macos",
+      "NoteM.app.tar.gz.sig",
+    ]);
+
+    const outputDirectory = await collect("darwin-aarch64", sourceRoot);
+    assert.equal(
+      await fs.readFile(
+        path.join(outputDirectory, `NoteM_${VERSION}_aarch64.app.tar.gz`),
+        "utf8",
+      ),
+      `contents for NoteM_${VERSION}_aarch64.app.tar.gz`,
+    );
+    assert.equal(
+      await fs.readFile(
+        path.join(outputDirectory, `NoteM_${VERSION}_aarch64.app.tar.gz.sig`),
+        "utf8",
+      ),
+      `contents for NoteM_${VERSION}_aarch64.app.tar.gz.sig`,
+    );
+    assert.equal(
+      await fs.readFile(
+        path.join(outputDirectory, `NoteM_${VERSION}_aarch64.dmg`),
+        "utf8",
+      ),
+      `contents for NoteM_${VERSION}_aarch64.dmg`,
+    );
+  });
+});
+
+test("rejects a missing macOS updater tarball or signature", async () => {
+  for (const missingName of [
+    `NoteM_${VERSION}_aarch64.app.tar.gz`,
+    `NoteM_${VERSION}_aarch64.app.tar.gz.sig`,
+  ]) {
+    await withFixture("darwin-aarch64", async ({ sourceRoot }) => {
+      const definition = releaseArtifactDefinitions(
+        "darwin-aarch64",
+        VERSION,
+      ).find(({ name }) => name === missingName);
+      assert.ok(definition);
+      await fs.rm(path.join(sourceRoot, ...definition.source));
+      await assert.rejects(
+        collect("darwin-aarch64", sourceRoot),
+        new RegExp(
+          `missing expected artifact: ${missingName.replaceAll(".", "\\.")}`,
+        ),
+      );
+    });
+  }
+});
+
+test("rejects zero-byte macOS updater artifacts", async () => {
+  for (const suffix of [".app.tar.gz", ".app.tar.gz.sig"]) {
+    await withFixture("darwin-aarch64", async ({ sourceRoot }) => {
+      const rawName = `NoteM${suffix}`;
+      await fs.writeFile(path.join(sourceRoot, "bundle", "macos", rawName), "");
+      await assert.rejects(
+        collect("darwin-aarch64", sourceRoot),
+        /zero-byte artifact: NoteM_0\.2\.3_aarch64\.app\.tar\.gz(?:\.sig)?/,
+      );
+    });
+  }
+});
+
+test("rejects a symbolic link posing as a raw macOS updater artifact", async () => {
+  await withFixture("darwin-aarch64", async ({ sourceRoot }) => {
+    const artifact = path.join(
+      sourceRoot,
+      "bundle",
+      "macos",
+      "NoteM.app.tar.gz",
+    );
+    const target = path.join(sourceRoot, "real-artifact.tar.gz");
+    await fs.writeFile(target, "real artifact");
+    await fs.rm(artifact);
+    await fs.symlink(target, artifact);
+
+    await assert.rejects(
+      collect("darwin-aarch64", sourceRoot),
+      /ambiguous artifact entry/,
+    );
+  });
+});
+
+test("keeps Linux and Windows source and destination mappings unchanged", () => {
+  assert.deepEqual(
+    releaseArtifactDefinitions("linux-x86_64", VERSION).map(
+      ({ name, source }) => ({
+        name,
+        source,
+      }),
+    ),
+    [
+      {
+        name: `NoteM_${VERSION}_amd64.AppImage`,
+        source: ["bundle", "appimage", `NoteM_${VERSION}_amd64.AppImage`],
+      },
+      {
+        name: `NoteM_${VERSION}_amd64.AppImage.sig`,
+        source: ["bundle", "appimage", `NoteM_${VERSION}_amd64.AppImage.sig`],
+      },
+      {
+        name: `NoteM_${VERSION}_amd64.deb`,
+        source: ["bundle", "deb", `NoteM_${VERSION}_amd64.deb`],
+      },
+    ],
+  );
+  assert.deepEqual(
+    releaseArtifactDefinitions("windows-x86_64", VERSION).map(
+      ({ name, source }) => ({
+        name,
+        source,
+      }),
+    ),
+    [
+      {
+        name: `NoteM_${VERSION}_x64-setup.exe`,
+        source: ["bundle", "nsis", `NoteM_${VERSION}_x64-setup.exe`],
+      },
+      {
+        name: `NoteM_${VERSION}_x64-setup.exe.sig`,
+        source: ["bundle", "nsis", `NoteM_${VERSION}_x64-setup.exe.sig`],
+      },
+    ],
+  );
+});
+
 test("rejects unexpected recognized release artifacts", async () => {
   const cases = [
     {

@@ -131,15 +131,15 @@ On an Apple Silicon Mac:
 rustup target add aarch64-apple-darwin
 export TAURI_SIGNING_PRIVATE_KEY="$(< ~/.tauri/notem-updater.key)"
 export TAURI_SIGNING_PRIVATE_KEY_PASSWORD="use-the-key-password"
-pnpm tauri build --target aarch64-apple-darwin --bundles dmg --config src-tauri/tauri.updater.conf.json
+pnpm tauri build --target aarch64-apple-darwin --bundles app,dmg --config src-tauri/tauri.updater.conf.json
 ```
 
 Artifact:
 
 ```text
 src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/NoteM_<version>_aarch64.dmg
-src-tauri/target/aarch64-apple-darwin/release/bundle/macos/NoteM_<version>_aarch64.app.tar.gz
-src-tauri/target/aarch64-apple-darwin/release/bundle/macos/NoteM_<version>_aarch64.app.tar.gz.sig
+src-tauri/target/aarch64-apple-darwin/release/bundle/macos/NoteM.app.tar.gz
+src-tauri/target/aarch64-apple-darwin/release/bundle/macos/NoteM.app.tar.gz.sig
 ```
 
 #### Windows x64

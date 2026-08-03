@@ -18,6 +18,21 @@ test("release workflow retains its hardened controls and updater-only scope", as
   await assert.doesNotReject(validateRepositoryWorkflowPolicy(repositoryRoot));
 });
 
+test("macOS release build requests the app bundle needed for updater artifacts", async () => {
+  const workflow = await readFile(
+    path.join(repositoryRoot, ".github", "workflows", "release.yml"),
+    "utf8",
+  );
+  assert.match(
+    workflow,
+    /platform_key: darwin-aarch64\n\s+tauri_args: --target aarch64-apple-darwin --bundles app,dmg /,
+  );
+  assert.doesNotMatch(
+    workflow,
+    /platform_key: darwin-aarch64\n\s+tauri_args: --target aarch64-apple-darwin --bundles dmg(?:\s|$)/,
+  );
+});
+
 async function policyFixture() {
   const read = (file) => readFile(path.join(repositoryRoot, file), "utf8");
   const [

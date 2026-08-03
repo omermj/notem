@@ -99,6 +99,42 @@ async function rejectAmbiguousFiles(sourceRoot, definitions) {
   }
 }
 
+async function printBundleOutputDiagnostics(sourceRoot) {
+  const bundleRoot = path.join(sourceRoot, "bundle");
+  try {
+    const bundleEntries = await fs.readdir(bundleRoot, { withFileTypes: true });
+    const lines = [];
+    for (const bundleEntry of bundleEntries.sort((left, right) =>
+      left.name.localeCompare(right.name),
+    )) {
+      const bundlePath = path.join(bundleRoot, bundleEntry.name);
+      if (!bundleEntry.isDirectory()) {
+        lines.push(
+          `${path.relative(sourceRoot, bundlePath)} [not a directory]`,
+        );
+        continue;
+      }
+      const entries = await fs.readdir(bundlePath, { withFileTypes: true });
+      const names = entries
+        .sort((left, right) => left.name.localeCompare(right.name))
+        .map(
+          (entry) =>
+            `${entry.name}${entry.isSymbolicLink() ? " [symlink]" : ""}`,
+        );
+      lines.push(
+        `${path.relative(sourceRoot, bundlePath)}: ${names.join(", ") || "(empty)"}`,
+      );
+    }
+    console.error(
+      `Bundle output diagnostics for ${sourceRoot}:\n${lines.join("\n") || "(empty bundle directory)"}`,
+    );
+  } catch (error) {
+    console.error(
+      `Bundle output diagnostics unavailable for ${sourceRoot}: ${error instanceof Error ? error.message : error}`,
+    );
+  }
+}
+
 export async function collectReleaseArtifacts({
   platform,
   version,
@@ -134,12 +170,18 @@ async function main() {
     );
   }
   const version = tag.slice(1);
-  await collectReleaseArtifacts({
-    platform: argumentsByName.platform,
-    version,
-    sourceRoot: path.resolve(argumentsByName.source_root),
-    outputDirectory: path.resolve(argumentsByName.output),
-  });
+  const sourceRoot = path.resolve(argumentsByName.source_root);
+  try {
+    await collectReleaseArtifacts({
+      platform: argumentsByName.platform,
+      version,
+      sourceRoot,
+      outputDirectory: path.resolve(argumentsByName.output),
+    });
+  } catch (error) {
+    await printBundleOutputDiagnostics(sourceRoot);
+    throw error;
+  }
   console.log(`Collected exact ${argumentsByName.platform} release artifacts.`);
 }
 

@@ -82,7 +82,7 @@ jobs:
             platform: macos-14
             rust_target: aarch64-apple-darwin
             platform_key: darwin-aarch64
-            tauri_args: --target aarch64-apple-darwin --bundles dmg --config src-tauri/tauri.updater.conf.json
+            tauri_args: --target aarch64-apple-darwin --bundles app,dmg --config src-tauri/tauri.updater.conf.json
             artifact_name: installers-macos-arm64
             target_root: src-tauri/target/aarch64-apple-darwin/release
           - name: Windows x64
