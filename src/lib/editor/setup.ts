@@ -210,6 +210,7 @@ export function createMarkdownEditor(
 ): MarkdownEditor {
   let applyingExternalDocument = false;
   let typingStartedAt = 0;
+  let releaseInitialScrollPin: (() => void) | null = null;
   const appearance = new Compartment();
   const spellcheck = new Compartment();
   const activeLineHighlight = new Compartment();
@@ -291,6 +292,11 @@ export function createMarkdownEditor(
         },
       }),
       EditorView.updateListener.of((update) => {
+        if (
+          update.transactions.some((transaction) => transaction.scrollIntoView)
+        ) {
+          releaseInitialScrollPin?.();
+        }
         if (update.docChanged && !applyingExternalDocument) {
           options.onChange(update.state.doc.toString());
           if (typingStartedAt) {
@@ -318,12 +324,52 @@ export function createMarkdownEditor(
   });
   const view = new EditorView({ state, parent: options.parent });
   view.scrollDOM.scrollTop = options.initialScrollTop ?? 0;
-  view.scrollDOM.addEventListener("scroll", () => {
+  let scrollPinActive = false;
+  let resizeObserver: ResizeObserver | null = null;
+  let scrollPinTimeout: number | null = null;
+  const initialScrollTop = options.initialScrollTop;
+  const interactionTarget = options.parent.parentElement ?? view.dom;
+  const unlockEvents = [
+    "wheel",
+    "touchstart",
+    "pointerdown",
+    "keydown",
+    "focusin",
+  ];
+  const unlockScrollPin = (): void => {
+    if (!scrollPinActive) return;
+    scrollPinActive = false;
+    resizeObserver?.disconnect();
+    resizeObserver = null;
+    if (scrollPinTimeout !== null) {
+      window.clearTimeout(scrollPinTimeout);
+      scrollPinTimeout = null;
+    }
+    for (const event of unlockEvents) {
+      interactionTarget.removeEventListener(event, unlockScrollPin);
+    }
+  };
+  releaseInitialScrollPin = unlockScrollPin;
+  const handleScroll = (): void => {
     options.onPosition?.(
       view.state.selection.main.head,
       view.scrollDOM.scrollTop,
     );
-  });
+  };
+  view.scrollDOM.addEventListener("scroll", handleScroll);
+  if (initialScrollTop !== undefined) {
+    scrollPinActive = true;
+    resizeObserver = new ResizeObserver(() => {
+      if (scrollPinActive) view.scrollDOM.scrollTop = initialScrollTop;
+    });
+    resizeObserver.observe(view.dom);
+    for (const event of unlockEvents) {
+      interactionTarget.addEventListener(event, unlockScrollPin);
+    }
+    // Keep the pin only long enough for the asynchronously loaded properties
+    // panel to settle, then let normal layout and navigation control scrolling.
+    scrollPinTimeout = window.setTimeout(unlockScrollPin, 2000);
+  }
   return {
     view,
     setDocument(content: string): void {
@@ -336,6 +382,7 @@ export function createMarkdownEditor(
       applyingExternalDocument = false;
     },
     insert(text: string): void {
+      unlockScrollPin();
       const selection = view.state.selection.main;
       view.dispatch({
         changes: { from: selection.from, to: selection.to, insert: text },
@@ -368,6 +415,7 @@ export function createMarkdownEditor(
       });
     },
     jumpToLine(line: number, start?: number, end?: number): void {
+      unlockScrollPin();
       const boundedLine = Math.max(1, Math.min(line, view.state.doc.lines));
       const documentLine = view.state.doc.line(boundedLine);
       const from = Math.max(
@@ -391,6 +439,9 @@ export function createMarkdownEditor(
       }, 1200);
     },
     destroy(): void {
+      unlockScrollPin();
+      releaseInitialScrollPin = null;
+      view.scrollDOM.removeEventListener("scroll", handleScroll);
       view.destroy();
     },
   };
