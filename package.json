@@ -44,7 +44,7 @@
     "dictionary-en": "^4.0.0",
     "markdown-it": "^14.1.0",
     "nspell": "^2.1.5",
-    "pdfjs-dist": "6.1.200",
+    "pdfjs-dist": "6.2.108",
     "svelte": "^5.38.7"
   },
   "devDependencies": {
