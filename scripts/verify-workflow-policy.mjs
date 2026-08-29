@@ -8,6 +8,10 @@ const SIGNING_SECRET_NAMES = [
   "TAURI_SIGNING_PRIVATE_KEY",
   "TAURI_SIGNING_PRIVATE_KEY_PASSWORD",
 ];
+const SIGNING_SECRET_STEPS = [
+  "Build platform bundle",
+  "Re-sign Linux AppImage",
+];
 
 function policyError(message) {
   return new Error(`Workflow policy: ${message}`);
@@ -93,18 +97,17 @@ function assertSingleWriteJob(workflows) {
 
 function assertSigningSecretScope(releaseWorkflow, nativeWorkflow, ciWorkflow) {
   const releaseLines = workflowLines(releaseWorkflow);
-  const secretLines = [];
+  const orderedSecretNames = [...SIGNING_SECRET_NAMES].sort(
+    (left, right) => right.length - left.length,
+  );
+  const secretSteps = new Map();
   for (const [lineIndex, line] of releaseLines.entries()) {
-    if (SIGNING_SECRET_NAMES.some((name) => line.includes(name))) {
-      secretLines.push({ lineIndex, line });
-    }
-  }
-  if (secretLines.length !== SIGNING_SECRET_NAMES.length) {
-    throw policyError(
-      "release workflow must reference each signing secret exactly once in the build step.",
+    const secretName = orderedSecretNames.find((name) =>
+      line.includes(`secrets.${name}`),
     );
-  }
-  for (const { lineIndex } of secretLines) {
+    if (secretName === undefined) {
+      continue;
+    }
     let stepName = null;
     for (let index = lineIndex; index >= 0; index -= 1) {
       const step = /^[ ]{6}- name: (.+)$/.exec(releaseLines[index]);
@@ -113,11 +116,37 @@ function assertSigningSecretScope(releaseWorkflow, nativeWorkflow, ciWorkflow) {
         break;
       }
     }
-    if (stepName !== "Build platform bundle") {
+    if (stepName === null) {
       throw policyError(
-        "signing secrets must be scoped only to the platform bundle build step.",
+        `signing secret ${secretName} must be scoped to a named workflow step.`,
       );
     }
+    const secretStepsForStep = secretSteps.get(stepName) ?? [];
+    secretStepsForStep.push(secretName);
+    secretSteps.set(stepName, secretStepsForStep);
+  }
+  for (const stepName of secretSteps.keys()) {
+    if (!SIGNING_SECRET_STEPS.includes(stepName)) {
+      throw policyError(
+        `signing secrets must be scoped only to these steps: ${SIGNING_SECRET_STEPS.join(", ")} (found ${stepName}).`,
+      );
+    }
+    const secretStepsForStep = secretSteps.get(stepName);
+    for (const name of SIGNING_SECRET_NAMES) {
+      if (
+        secretStepsForStep.filter((secretName) => secretName === name)
+          .length !== 1
+      ) {
+        throw policyError(
+          `release workflow must reference each signing secret exactly once per signing step; step ${stepName} does not.`,
+        );
+      }
+    }
+  }
+  if (secretSteps.size !== SIGNING_SECRET_STEPS.length) {
+    throw policyError(
+      `release workflow must scope signing secrets to exactly these steps: ${SIGNING_SECRET_STEPS.join(", ")} (found ${[...secretSteps.keys()].join(", ") || "none"}).`,
+    );
   }
   if (
     SIGNING_SECRET_NAMES.some(
@@ -185,6 +214,9 @@ function assertReleaseControls(releaseWorkflow) {
     "environment: release",
     "contents: read",
     "pnpm tauri build",
+    "scripts/fix-linux-appimage.sh",
+    "pnpm tauri signer sign",
+    "scripts/verify-linux-appimage.mjs",
     "scripts/generate-updater-manifest.mjs",
     "scripts/generate-sha256sums.mjs",
     "scripts/verify-release-assets.mjs",

@@ -123,6 +123,23 @@ src-tauri/target/release/bundle/appimage/NoteM_<version>_amd64.AppImage.sig
 src-tauri/target/release/bundle/deb/NoteM_<version>_amd64.deb
 ```
 
+#### Required Linux AppImage post-processing
+
+Tauri's AppImage packaging bundles `libwayland-client.so.0` from the Ubuntu 22.04 build base. On modern Fedora releases, the host Mesa/EGL stack loads that older library and WebKitGTK aborts before the window renders: `Could not create default EGL display: EGL_BAD_PARAMETER`. Every Linux AppImage must therefore be patched with the repository fixer and re-signed before it is uploaded:
+
+```sh
+bash scripts/fix-linux-appimage.sh \
+  src-tauri/target/release/bundle/appimage/NoteM_<version>_amd64.AppImage
+export TAURI_SIGNING_PRIVATE_KEY="$(< ~/.tauri/notem-updater.key)"
+export TAURI_SIGNING_PRIVATE_KEY_PASSWORD="use-the-key-password"
+pnpm tauri signer sign \
+  src-tauri/target/release/bundle/appimage/NoteM_<version>_amd64.AppImage
+node scripts/verify-linux-appimage.mjs \
+  src-tauri/target/release/bundle/appimage/NoteM_<version>_amd64.AppImage
+```
+
+The fixer removes every bundled `libwayland-client.so.0*`, repacks the AppImage, and deletes the now-invalid `.sig`; the signer recreates the signature for the final binary. The verifier extracts the result and fails if the library is still bundled. The hosted release workflow performs the same three steps between the Tauri build and artifact collection. The fixer downloads checksum-pinned `appimagetool` and runtime release artifacts from the AppImage organization; override with `APPIMAGETOOL_BIN` and `APPIMAGE_RUNTIME_FILE` when they are already available locally.
+
 #### macOS ARM
 
 On an Apple Silicon Mac:
@@ -200,7 +217,7 @@ This option consumes GitHub-hosted Linux, macOS, and Windows runner minutes, but
 4. Enter the existing annotated tag, such as `v0.2.1`.
 5. Review and approve the final `release` environment deployment after all three builds pass.
 
-The workflow validates the tag through the GitHub API before checkout, resolves it to a commit SHA, and gives the platform build jobs read-only repository access. Those jobs verify the application version, run native tests and Clippy, build with the release-only updater overlay and step-scoped signing secrets, validate legal files and the Windows GUI subsystem, and upload short-lived Actions artifacts. A separate environment-gated job rechecks that the tag did not move, downloads all three platform artifacts, rejects missing, duplicate, ambiguous, empty, or unexpected files, obtains deterministic notes, derives `pub_date` from the immutable annotated tag timestamp, generates `latest.json`, generates `SHA256SUMS`, and creates or updates only a draft GitHub Release. It refuses to modify an already-published release and never publishes a draft automatically.
+The workflow validates the tag through the GitHub API before checkout, resolves it to a commit SHA, and gives the platform build jobs read-only repository access. Those jobs verify the application version, run native tests and Clippy, build with the release-only updater overlay and step-scoped signing secrets, patch the Linux AppImage (removing the bundled `libwayland-client.so.0`) and re-sign it, validate legal files, the fixed AppImage contents, and the Windows GUI subsystem, and upload short-lived Actions artifacts. A separate environment-gated job rechecks that the tag did not move, downloads all three platform artifacts, rejects missing, duplicate, ambiguous, empty, or unexpected files, obtains deterministic notes, derives `pub_date` from the immutable annotated tag timestamp, generates `latest.json`, generates `SHA256SUMS`, and creates or updates only a draft GitHub Release. It refuses to modify an already-published release and never publishes a draft automatically.
 
 Uploading updater files to a draft does not activate the updater. The application reads `latest.json` from GitHub's `/releases/latest/download/latest.json` endpoint, which resolves to the latest published stable release; a draft is not visible there.
 

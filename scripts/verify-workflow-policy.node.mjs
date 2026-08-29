@@ -123,6 +123,36 @@ test("rejects signing secrets in ordinary native validation", async () => {
   );
 });
 
+test("signing secrets must stay scoped to the build and re-sign steps", async () => {
+  const fixture = await policyFixture();
+  fixture.releaseWorkflow = fixture.releaseWorkflow.replace(
+    "- name: Re-sign Linux AppImage",
+    "- name: Rename an unrelated file",
+  );
+  assert.throws(
+    () => validateWorkflowPolicy(fixture),
+    /signing secrets must be scoped only to these steps/,
+  );
+});
+
+test("removing the AppImage re-sign step fails the workflow policy", async () => {
+  const fixture = await policyFixture();
+  const stepStart = fixture.releaseWorkflow.indexOf(
+    "      - name: Re-sign Linux AppImage",
+  );
+  const nextStep = fixture.releaseWorkflow.indexOf(
+    "      - name: Verify fixed Linux AppImage",
+  );
+  assert.ok(stepStart !== -1 && nextStep > stepStart);
+  fixture.releaseWorkflow =
+    fixture.releaseWorkflow.slice(0, stepStart) +
+    fixture.releaseWorkflow.slice(nextStep);
+  assert.throws(
+    () => validateWorkflowPolicy(fixture),
+    /must scope signing secrets to exactly these steps/,
+  );
+});
+
 test("release asset verification retries GitHub release metadata propagation", async () => {
   const workflow = await readFile(
     path.join(repositoryRoot, ".github", "workflows", "release.yml"),
