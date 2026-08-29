@@ -175,6 +175,35 @@ jobs:
           }
           Write-Host "Verified Windows GUI subsystem 2 (no console window)."
 
+      - name: Fix Linux AppImage
+        if: runner.os == 'Linux'
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          appimage_path="src-tauri/target/release/bundle/appimage/NoteM_${RELEASE_TAG#v}_amd64.AppImage"
+          bash scripts/fix-linux-appimage.sh "$appimage_path"
+
+      - name: Re-sign Linux AppImage
+        if: runner.os == 'Linux'
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          node scripts/verify-signing-secrets.mjs
+          appimage_path="src-tauri/target/release/bundle/appimage/NoteM_${RELEASE_TAG#v}_amd64.AppImage"
+          pnpm tauri signer sign "$appimage_path"
+          signature_path="${appimage_path}.sig"
+          test -s "$signature_path"
+
+      - name: Verify fixed Linux AppImage
+        if: runner.os == 'Linux'
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          appimage_path="src-tauri/target/release/bundle/appimage/NoteM_${RELEASE_TAG#v}_amd64.AppImage"
+          node scripts/verify-linux-appimage.mjs "$appimage_path"
+
       - name: Verify bundled legal documents
         run: node scripts/verify-bundle-legal.mjs ${{ matrix.target_root }}
 
