@@ -47,6 +47,7 @@ impl VaultWatcher {
                 break;
             }
             let first = match event_receiver.recv_timeout(Duration::from_millis(100)) {
+                Ok(Ok(event)) if !is_index_relevant_event(&event) => continue,
                 Ok(Ok(event)) => event,
                 Ok(Err(_)) => continue,
                 Err(RecvTimeoutError::Timeout) => continue,
@@ -63,6 +64,7 @@ impl VaultWatcher {
                     break;
                 }
                 match event_receiver.recv_timeout(remaining) {
+                    Ok(Ok(event)) if !is_index_relevant_event(&event) => {}
                     Ok(Ok(event)) => {
                         events.push(event);
                         deadline = Instant::now() + DEBOUNCE;
@@ -101,11 +103,22 @@ impl Drop for VaultWatcher {
     }
 }
 
+fn is_index_relevant_event(event: &Event) -> bool {
+    // `notify`'s Linux backend reports IN_OPEN and both close variants as
+    // access events. Reading the vault (including our own tree refresh) must
+    // not be mistaken for an external edit or it creates an index/update
+    // feedback loop.
+    !event.kind.is_access()
+}
+
 fn process_events(vault: &Path, events: Vec<Event>) -> Result<Vec<String>, AppError> {
     let mut markdown_paths = HashSet::new();
     let mut changed_paths = HashSet::new();
     let mut needs_full_scan = false;
     for event in events {
+        if !is_index_relevant_event(&event) {
+            continue;
+        }
         for path in event.paths {
             if is_notem_path(vault, &path) {
                 continue;
@@ -145,4 +158,38 @@ fn is_notem_path(vault: &Path, path: &Path) -> bool {
             .next()
             .is_some_and(|component| component == Component::Normal(".notem".as_ref()))
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use std::fs;
+
+    use notify::{
+        event::{AccessKind, AccessMode},
+        EventKind,
+    };
+    use tempfile::tempdir;
+
+    use super::{is_index_relevant_event, process_events, Event};
+
+    #[test]
+    fn ignores_linux_read_access_events() {
+        let vault = tempdir().expect("temporary vault");
+        let note = vault.path().join("Note.md");
+        fs::write(&note, "# Note").expect("fixture note");
+        let events = [
+            Event::new(EventKind::Access(AccessKind::Open(AccessMode::Read)))
+                .add_path(note.clone()),
+            Event::new(EventKind::Access(AccessKind::Close(AccessMode::Read)))
+                .add_path(note),
+            Event::new(EventKind::Access(AccessKind::Open(AccessMode::Read)))
+                .add_path(vault.path().to_path_buf()),
+        ];
+
+        assert!(events.iter().all(|event| !is_index_relevant_event(event)));
+        assert_eq!(
+            process_events(vault.path(), events.into()).expect("process access events"),
+            Vec::<String>::new()
+        );
+    }
 }
