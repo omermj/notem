@@ -196,6 +196,31 @@ fn external_edit_is_debounced_and_reindexed_by_watcher() {
     );
 }
 
+#[cfg(target_os = "linux")]
+#[test]
+fn reading_the_vault_does_not_trigger_a_watcher_update() {
+    let vault = fixture_vault();
+    let root = vault.path().canonicalize().expect("canonical vault path");
+    db::full_scan(&root, |_| {}).expect("scan fixture");
+    let (sender, receiver) = mpsc::channel();
+    let _watcher = VaultWatcher::start(
+        root.clone(),
+        move |paths| {
+            let _ = sender.send(paths);
+        },
+        || {},
+    )
+    .expect("start watcher");
+
+    fs::read_to_string(root.join("Home.md")).expect("read note");
+    fs::read_dir(&root)
+        .expect("read vault directory")
+        .collect::<Result<Vec<_>, _>>()
+        .expect("list vault directory");
+
+    assert!(receiver.recv_timeout(Duration::from_secs(1)).is_err());
+}
+
 #[test]
 fn external_pdf_edit_is_reported_without_indexing_content() {
     let vault = fixture_vault();
