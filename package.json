@@ -42,7 +42,7 @@
     "@tauri-apps/plugin-updater": "^2.10.1",
     "d3-force": "^3.0.0",
     "dictionary-en": "^4.0.0",
-    "markdown-it": "^14.1.0",
+    "markdown-it": "^14.3.3",
     "nspell": "^2.1.5",
     "pdfjs-dist": "6.1.200",
     "svelte": "^5.38.7"
